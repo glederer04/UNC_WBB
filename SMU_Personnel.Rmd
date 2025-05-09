@@ -1,0 +1,299 @@
+---
+title: "BC_Personnel"
+author: "Greg"
+date: "2025-01-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB/24-25 Games/1-16 SMU")
+```
+
+#packages
+```{r}
+library(dplyr)
+library(tidyr)
+library(gt)
+library(gtExtras)
+library(readxl)
+library(glue)
+library(ggplot2)
+source('https://gist.github.com/andreweatherman/0a81c7122a133a015583587573a123ff/raw/4cd6b9db1d39c46e1b93b069bc801e4eac846b19/gt_plt_bar_pct.R')
+```
+
+#data
+```{r}
+path <- '/Users/gregorylederer/Desktop/UNC WBB/24-25 Games/1-16 SMU/SMU_Personnel.xlsx'
+Robertson1 <- read_excel(path = path, sheet = 1)
+Robertson2 <- read_excel(path = path, sheet = 2)
+Embry1 <- read_excel(path = path, sheet = 3)
+Embry2 <- read_excel(path = path, sheet = 4)
+Peterson1 <- read_excel(path = path, sheet = 5)
+Peterson2 <- read_excel(path = path, sheet = 6)
+Jones1 <- read_excel(path = path, sheet = 7)
+Jones2 <- read_excel(path = path, sheet = 8)
+
+team_img <- 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/SMU_Mustang_logo.svg/1200px-SMU_Mustang_logo.svg.png'
+team_color1 <- '#0033A0'
+team_color2 <- '#C8102E'
+```
+
+#Robertson
+```{r}
+player <- '#3 Nya Robertson'
+player_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5107471.png&w=350&h=254'
+player_style <- 'Secondary Ball Handler'
+player_ht <- '5-7'
+player_yr <- 'Jr.'
+
+player_subtitle <- paste0(player_style, ' | ', player_ht, ' | ', player_yr)
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 0px;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>{player}</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: normal;'>{player_subtitle}</span>
+    </div>
+    <div style='text-align: right;'>
+      <img src='{team_img}' style='height: 40px; width: auto; border-radius: 5px;'>
+    </div>
+  </div>"
+)
+
+tbl1 <- Robertson1 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), efg. = md('**eFG%**'), tpa_fga = md('**3PA/FGA**'), tov. = md('**Tov%**')) %>%
+  tab_header(title = html(title_header)) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, efg., tpa_fga, tov.)), style = cell_text(align = 'center')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Robertson1$ppg), max(Robertson1$ppg)))) %>%
+  data_color(columns = vars(efg.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Robertson1$efg.), max(Robertson1$efg.)))) %>%
+  data_color(columns = vars(tpa_fga), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Robertson1$tpa_fga), max(Robertson1$tpa_fga)))) %>%
+  data_color(columns = vars(tov.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Robertson1$tov.), max(Robertson1$tov.))))
+tbl1
+
+Robertson2 <- Robertson2 %>%
+  mutate(pps.ptile = pps.ptile/100)
+
+tbl2 <- Robertson2 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  tab_header(title = html(title_header)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, pps, pps.ptile)), style = cell_text(align = 'center')) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), pps = md('**PPS**'), pps.ptile = md('**PPS %ile**')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Robertson2$ppg), max(Robertson2$ppg)))) %>%
+  data_color(columns = vars(pps), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Robertson2$pps), max(Robertson2$pps)))) %>%
+  gt_bars(pps.ptile, labels = TRUE, fill = team_color1, domain = 0:1, digits = 0) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  cols_width(pps.ptile ~ px(150))
+tbl2
+```
+
+#Embry
+```{r}
+player <- "#33 Chantae Embry"
+player_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4898416.png&w=350&h=254'
+player_style <- 'Stretch Big'
+player_ht <- '6-1'
+player_yr <- 'Sr.'
+
+player_subtitle <- paste0(player_style, ' | ', player_ht, ' | ', player_yr)
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 0px;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>{player}</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: normal;'>{player_subtitle}</span>
+    </div>
+    <div style='text-align: right;'>
+      <img src='{team_img}' style='height: 40px; width: auto; border-radius: 5px;'>
+    </div>
+  </div>"
+)
+
+tbl3 <- Embry1 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), efg. = md('**eFG%**'), fta_fga = md('**FTA/FGA**'), tov. = md('**Tov%**')) %>%
+  tab_header(title = html(title_header)) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, efg., fta_fga, tov.)), style = cell_text(align = 'center')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Embry1$ppg), max(Embry1$ppg)))) %>%
+  data_color(columns = vars(efg.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Embry1$efg.), max(Embry1$efg.)))) %>%
+  data_color(columns = vars(fta_fga), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Embry1$fta_fga), max(Embry1$fta_fga)))) %>%
+  data_color(columns = vars(tov.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Embry1$tov.), max(Embry1$tov.))))
+tbl3
+
+Embry2 <- Embry2 %>%
+  mutate(pps.ptile = pps.ptile/100)
+
+tbl4 <- Embry2 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  tab_header(title = html(title_header)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, pps, pps.ptile)), style = cell_text(align = 'center')) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), pps = md('**PPS**'), pps.ptile = md('**PPS %ile**')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Embry2$ppg), max(Embry2$ppg)))) %>%
+  data_color(columns = vars(pps), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Embry2$pps), max(Embry2$pps)))) %>%
+  gt_bars(pps.ptile, labels = TRUE, fill = team_color1, domain = 0:1, digits = 0) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  cols_width(pps.ptile ~ px(150))
+tbl4
+```
+
+#Peterson
+```{r}
+player <- "#35 Jessica Peterson"
+player_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4900570.png&w=350&h=254'
+player_style <- 'Post-Up Big'
+player_ht <- '6-2'
+player_yr <- 'Sr.'
+
+player_subtitle <- paste0(player_style, ' | ', player_ht, ' | ', player_yr)
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 0px;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>{player}</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: normal;'>{player_subtitle}</span>
+    </div>
+    <div style='text-align: right;'>
+      <img src='{team_img}' style='height: 40px; width: auto; border-radius: 5px;'>
+    </div>
+  </div>"
+)
+
+tbl5 <- Peterson1 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), fg. = md('**FG%**'), fta_fga = md('**FTA/FGA**'), tov. = md('**Tov%**')) %>%
+  tab_header(title = html(title_header)) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, fg., fta_fga, tov.)), style = cell_text(align = 'center')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Peterson1$ppg), max(Peterson1$ppg)))) %>%
+  data_color(columns = vars(fg.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Peterson1$fg.), max(Peterson1$fg.)))) %>%
+  data_color(columns = vars(fta_fga), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Peterson1$fta_fga), max(Peterson1$fta_fga)))) %>%
+  data_color(columns = vars(tov.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Peterson1$tov.), max(Peterson1$tov.))))
+tbl5
+
+Peterson2 <- Peterson2 %>%
+  mutate(pps.ptile = pps.ptile/100)
+
+tbl6 <- Peterson2 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  tab_header(title = html(title_header)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, pps, pps.ptile)), style = cell_text(align = 'center')) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), pps = md('**PPS**'), pps.ptile = md('**PPS %ile**')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Peterson2$ppg), max(Peterson2$ppg)))) %>%
+  data_color(columns = vars(pps), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Peterson2$pps), max(Peterson2$pps)))) %>%
+  gt_bars(pps.ptile, labels = TRUE, fill = team_color1, domain = 0:1, digits = 0) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  cols_width(pps.ptile ~ px(150))
+tbl6
+```
+
+#Jones
+```{r}
+player <- "#1 Zanai Jones"
+player_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4899023.png&w=350&h=254'
+player_style <- 'Playmaking Ball handler'
+player_ht <- '5-5'
+player_yr <- 'Sr.'
+
+player_subtitle <- paste0(player_style, ' | ', player_ht, ' | ', player_yr)
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 0px;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>{player}</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: normal;'>{player_subtitle}</span>
+    </div>
+    <div style='text-align: right;'>
+      <img src='{team_img}' style='height: 40px; width: auto; border-radius: 5px;'>
+    </div>
+  </div>"
+)
+
+tbl7 <- Jones1 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), efg. = md('**eFG%**'), tpa_fga = md('**3PA/FGA**'), tov. = md('**Tov%**')) %>%
+  tab_header(title = html(title_header)) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, efg., tpa_fga, tov.)), style = cell_text(align = 'center')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Jones1$ppg), max(Jones1$ppg)))) %>%
+  data_color(columns = vars(efg.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Jones1$efg.), max(Jones1$efg.)))) %>%
+  data_color(columns = vars(tpa_fga), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Jones1$tpa_fga), max(Jones1$tpa_fga)))) %>%
+  data_color(columns = vars(tov.), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Jones1$tov.), max(Jones1$tov.))))
+tbl7
+
+Jones2 <- Jones2 %>%
+  mutate(pps.ptile = pps.ptile/100)
+
+tbl8 <- Jones2 %>%
+  group_by(group) %>%
+  gt() %>%
+  tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+  tab_header(title = html(title_header)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = c(poss., ppg, pps, pps.ptile)), style = cell_text(align = 'center')) %>%
+  cols_label(stat = '', poss. = md('**Poss%**'), ppg = md('**PPG**'), pps = md('**PPS**'), pps.ptile = md('**PPS %ile**')) %>%
+  data_color(columns = vars(ppg), colors = scales::col_numeric(palette = c("transparent", team_color1), domain = c(min(Jones2$ppg), max(Jones2$ppg)))) %>%
+  data_color(columns = vars(pps), colors = scales::col_numeric(palette = c("transparent", team_color2), domain = c(min(Jones2$pps), max(Jones2$pps)))) %>%
+  gt_bars(pps.ptile, labels = TRUE, fill = team_color1, domain = 0:1, digits = 0) %>%
+  gt_add_divider(poss., weight = px(1)) %>%
+  cols_width(pps.ptile ~ px(150))
+tbl8
+```
+
+```{r}
+# gtsave(tbl1, filename = 'Nya Robertson | Play Type.png')
+# gtsave(tbl2, filename = 'Nya Robertson | Shot Type.png')
+# 
+# gtsave(tbl3, filename = 'Chantae Embry | Play Type.png')
+# gtsave(tbl4, filename = 'Chantae Embry | Shot Type.png')
+# 
+# gtsave(tbl5, filename = 'Jessica Peterson | Play Type.png')
+# gtsave(tbl6, filename = 'Jessica Peterson | Shot Type.png')
+# 
+# gtsave(tbl7, filename = 'Zanai Jones | Play Type.png')
+# gtsave(tbl8, filename = 'Zanai Jones | Shot Type.png')
+```
+

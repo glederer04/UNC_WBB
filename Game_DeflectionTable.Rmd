@@ -1,0 +1,79 @@
+---
+title: "Game_DeflectionTable"
+author: "Greg"
+date: "2024-11-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB/24-25 Games")
+```
+
+#team name
+```{r}
+select_opp <- 'Virginia'
+opp_image <- 'https://upload.wikimedia.org/wikipedia/en/thumb/1/1e/Virginia_Cavaliers_logo.svg/1200px-Virginia_Cavaliers_logo.svg.png'
+unc_image <- 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/400px-North_Carolina_Tar_Heels_logo.svg.png'
+```
+
+#packages
+```{r}
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(gt)
+library(gtExtras)
+library(glue)
+```
+
+```{r}
+path <- '/Users/gregorylederer/Desktop/UNC WBB/24-25 Games/S&D_Tracker.xlsx'
+data <- read_excel(path)
+opp_row <- data[16,]
+data <- data[-c(15:16),]
+
+data <- data %>%
+  arrange(desc(Deflections))
+totals_row <- tibble(
+  Player = 'Totals',
+  Deflections = sum(data$Deflections),
+  Steals = sum(data$Steals)
+)
+data <- rbind(data, totals_row)
+footer <- paste0(select_opp, ' - ', opp_row$Deflections[1], ' Deflections - ', opp_row$Steals[1], ' Steals')
+
+title <- glue("{select_opp} vs North Carolina<br>Deflections & Steals")
+subtitle <- glue("Full Game - March 2, 2025")
+title_header <- glue(
+  "<div style='display: flex; justify-content: space-between; align-items: center; background-color: #ffffff; padding: 10px; border-radius: 5px;'>
+    <div>
+      <img src='{opp_image}' style='height: 30px; width: auto; vertical-align: middle;'>
+    </div>
+    <div style='flex-grow: 1; text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-weight: bold; font-size: 18px; line-height: 1.2; text-decoration: underline;'>{title}</span><br>
+      <span style='font-family: Arial, serif; font-size: 12px; font-weight: normal; line-height: 1.2; font-style: italic;'>{subtitle}</span>
+    </div>
+    <div>
+      <img src='{unc_image}' style='height: 30px; width: auto; vertical-align: middle;'>
+    </div>
+  </div>"
+)
+tbl <- data %>%
+  gt() %>%
+  tab_header(title = md(title_header)) %>%
+  gt_highlight_rows(rows = c(15), fill = 'gray95') %>%
+  cols_label(Player = md("**<u>Player</u>**"), Deflections = md("**<u>Deflections</u>**"), Steals = md("**<u>Steals</u>**")) %>%
+  tab_style(style = list(cell_text(weight = "bold")), locations = cells_body(columns = "Player")) %>%
+  cols_align(align = "left", columns = "Player") %>%
+  cols_align(align = "center", columns = c("Deflections", "Steals")) %>%
+  tab_options(table.background.color = "white", table.font.color = "black") %>%
+  gt_add_divider(Player) %>%
+  tab_footnote(footnote = footer) %>%
+  tab_style(style = list(cell_text(align = 'center', style = 'italic', size = px(14))), locations = cells_footnotes()) %>%
+  tab_style(style = list(cell_text(align = 'center')), locations = cells_column_labels())
+tbl
+file_name <- paste0(select_opp, ' | Full Game D&S.png')
+gtsave(data = tbl, filename = file_name)
+```
+

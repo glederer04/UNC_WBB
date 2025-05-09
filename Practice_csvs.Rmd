@@ -1,0 +1,526 @@
+---
+title: "Practice"
+author: "Greg"
+date: "2024-05-15"
+output: html_document
+---
+
+```{r}
+Daily <- TRUE
+Weekly <- FALSE
+Week <- '03.04 - 03.10'
+Monthly <- FALSE
+Month <- 'March'
+Total <- TRUE
+Game <- FALSE
+
+path <- '/Users/gregorylederer/Desktop/UNC WBB/24-25 Prac/PracStats_24-25.xlsx'
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB/24-25 Prac")
+```
+
+```{r}
+library(readxl)
+library(openxlsx)
+library(dplyr)
+library(tidyverse)
+library(gt)
+library(gtExtras)
+library(glue)
+library(scales)
+library(paletteer)
+library(tidyr)
+library(data.table)
+library(ggforce)
+library(readr)
+
+Date <- format(Sys.Date(), format = "%m-%d-%Y")
+urls <- c('https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5174424.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5105721.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4433409.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4898548.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5174422.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5174423.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4898558.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5105740.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5174425.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4704116.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4433489.png&h=80&w=110&scale=crop',
+          'https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=110&h=80&scale=crop',
+          'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/400px-North_Carolina_Tar_Heels_logo.svg.png')
+
+tbl_image_df <- data.frame(Jordan = 'https://i.ebayimg.com/images/g/KKcAAOSw6H5aldKt/s-l1200.jpg', UNC = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4mzq28OohMYhB1tErXqobuNlBt2pdAM_OLdJaCwxVkA&s', Heel = 'https://pbs.twimg.com/media/GNuc3G1XoAA8TIz?format=png&name=240x240')
+#write.csv(tbl_image_df, file = 'tbl_images.csv')
+```
+
+#funcions
+```{r}
+rename1 <- function(data) {
+  data <- data %>% mutate_at(vars(3:17), as.numeric)
+  data <- data %>%
+    rename(
+      image = urls,
+      Player = ...1,
+      Points = Shooting,
+      Rim_make = ...3,
+      Rim_miss = ...4,
+      Mid_make = ...5,
+      Mid_miss = ...6,
+      Three_make = ...7,
+      Three_miss = ...8,
+      Off_reb = Rebounding,
+      Def_reb = ...10,
+      Ast = Misc.,
+      Stl = ...12,
+      Blk = ...13,
+      Tov = ...14,
+      Charges = ...15,
+      Fouls = ...16
+    )
+  return(data)
+}
+daily_csvs <- function(data) {
+  data <- data %>%
+    mutate(
+      Reb = (Off_reb+Def_reb),
+      Rim = paste0(Rim_make, '/', (Rim_make+Rim_miss)),
+      Rim. = round((Rim_make/(Rim_make+Rim_miss))*100,1),
+      Mid = paste0(Mid_make, '/', (Mid_make+Mid_miss)),
+      Mid. = round((Mid_make/(Mid_make+Mid_miss))*100,1),
+      Three = paste0(Three_make, '/', (Three_make+Three_miss)),
+      Three. = round((Three_make/(Three_make+Three_miss))*100,1),
+      FG = paste0((Rim_make+Mid_make+Three_make), '/', (Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss)),
+      FG. = round(((Rim_make+Mid_make+Three_make)/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      eFG. = round(((Rim_make+Mid_make+Three_make+(0.5*Three_make))/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      Two = paste0((Rim_make+Mid_make), '/', (Rim_make+Rim_miss+Mid_make+Mid_miss)),
+      Two. = round(((Rim_make+Mid_make)/(Rim_make+Rim_miss+Mid_make+Mid_miss))*100,1),
+      PPS = round((Points/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss)),2),
+      Ast_Tov = round((Ast/Tov)*100,1),
+      Ast_FGA = round((Ast/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1)
+    ) %>%
+    select(image, Player, Points, Reb, Ast,Off_reb, Def_reb, Rim, Rim., Mid, Mid., Three, Three., Off_reb, Def_reb, Stl, Blk, Tov, FG, FG., eFG., Two, Two., PPS, Ast_Tov, Ast_FGA)
+  data[is.na(data)] = 0
+  return(data)
+}
+WMT_csvs <- function(data) {
+  data <- data %>%
+    mutate(
+      Reb = (Off_reb+Def_reb),
+      Rim = paste0(Rim_make, '/', (Rim_make+Rim_miss)),
+      Rim. = round((Rim_make/(Rim_make+Rim_miss))*100,1),
+      Mid = paste0(Mid_make, '/', (Mid_make+Mid_miss)),
+      Mid. = round((Mid_make/(Mid_make+Mid_miss))*100,1),
+      Three = paste0(Three_make, '/', (Three_make+Three_miss)),
+      Three. = round((Three_make/(Three_make+Three_miss))*100,1),
+      FG = paste0((Rim_make+Mid_make+Three_make), '/', (Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss)),
+      FG. = round(((Rim_make+Mid_make+Three_make)/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      eFG. = round(((Rim_make+Mid_make+Three_make+(0.5*Three_make))/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      Two = paste0((Rim_make+Mid_make), '/', (Rim_make+Rim_miss+Mid_make+Mid_miss)),
+      Two. = round(((Rim_make+Mid_make)/(Rim_make+Rim_miss+Mid_make+Mid_miss))*100,1),
+      PPS = round((Points/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss)),2),
+      Ast_Tov = round((Ast/Tov)*100,1),
+      Ast_FGA = round((Ast/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      Rim_att = round(((Rim_make+Rim_miss)/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      Mid_att = round(((Mid_make+Mid_miss)/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+      Three_att = round(((Three_make+Three_miss)/(Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss))*100,1),
+    ) %>%
+    select(image, Player, Points, Reb, Ast, Off_reb, Def_reb, Rim, Rim., Mid, Mid., Three, Three., Off_reb, Def_reb, Stl, Blk, Tov, FG, FG., eFG., Two, Two., PPS, Ast_Tov, Ast_FGA, Rim_att, Mid_att, Three_att)
+  data[is.na(data)] = 0
+  return(data)
+}
+player_csv1 <- function(data) {
+  data <- data %>%
+    mutate(
+      Reb = (Off_reb+Def_reb),
+      Rim_att = (Rim_make+Rim_miss),
+      Mid_att = (Mid_make+Mid_miss),
+      Three_att = (Three_make+Three_miss),
+      Two_make = (Rim_make+Mid_make),
+      Two_att = (Rim_make+Rim_miss+Mid_make+Mid_miss),
+      FG_make = (Rim_make+Mid_make+Three_make),
+      FG_att = (Rim_make+Mid_make+Three_make+Rim_miss+Mid_miss+Three_miss)
+    ) %>%
+    select(Points, Ast, Reb, Off_reb, Def_reb, Rim_make, Rim_att, Mid_make, Mid_att, Three_make, Three_att, Two_make, Two_att, FG_make, FG_att, Stl, Blk, Tov)
+  return(data)
+}
+player_csv2 <- function(data) {
+  data <- data %>%
+    mutate(
+      Rim. = round((Rim_make/Rim_att)*100,1),
+      Mid. = round((Mid_make/Mid_att)*100,1),
+      Three. = round((Three_make/Three_att)*100,1),
+      FG. = round((FG_make/FG_att)*100,1),
+      eFG. = round(((FG_make+(0.5*Three_make))/FG_att)*100,1),
+      Rim_att_rate = round((Rim_att/FG_att)*100,1),
+      Mid_att_rate = round((Mid_att/FG_att)*100,1),
+      Three_att_rate = round((Three_att/FG_att)*100,1),
+      PPS = round((Points/FG_att),2),
+      Ast_Tov = round((Ast/Tov)*100,1),
+      Ast_FGA = round((Ast/(Rim_att+Mid_att+Three_att))*100,1)
+    ) %>%
+    select(Points, Ast, Reb, Off_reb, Def_reb, Rim_make, Rim_att, Mid_make, Mid_att, Three_make, Three_att, Two_make, Two_att, FG_make, FG_att, Stl, Blk, Tov, Rim., Mid., Three., FG., eFG., Rim_att_rate, Mid_att_rate, Three_att_rate, PPS, Ast_Tov, Ast_FGA)
+  return(data)
+}
+player_csv3 <- function(data) {
+  data <- data %>%
+    select(Points, Ast, Reb, Off_reb, Def_reb, Rim_make, Rim_att, Mid_make, Mid_att, Three_make, Three_att, Two_make, Two_att, FG_make, FG_att, Stl, Blk, Tov)
+  return(data)
+}
+```
+
+daily
+#```{r}
+if (Daily == TRUE){
+  data <- read_excel(path, 2)
+  data <- data[-c(1,17:31),]
+  data <- cbind(as.data.frame(urls), data)
+  data1 <- table1_funct(data)
+  title <- glue('Practice Stats')
+  subtitle <- glue('{format(Sys.Date(), "%m/%d/%Y")}')
+  title_header <- glue(
+    "<div style='display: flex; justify-content: space-between; align-items: center; background-color: #ffffff; padding: 10px; border-radius: 5px;'>
+      <div>
+        <img src='{tbl_image_df$UNC}' style='height: 65px; width: auto; vertical-align: middle;'>
+      </div>
+      <div style='flex-grow: 1; text-align: center;'>
+        <span style='font-family: Arial, sans-serif; font-weight: bold; font-size: 32px; line-height: 1.2; text-decoration: underline;'>{title}</span><br>
+        <span style='font-family: Arial, serif; font-size: 18px; font-weight: normal; line-height: 1.2; font-style: italic;'>{subtitle}
+          <img src='{tbl_image_df$Heel}' style='height: 40px; width: auto; vertical-align: middle; margin-left: 5px;'>
+        </span>
+      </div>
+      <div>
+        <img src='{tbl_image_df$Jordan}' style='height: 65px; width: auto; vertical-align: middle;'>
+      </div>
+    </div>"
+  )
+  custom_palette <- colorRampPalette(c("#ffffff", "#92bede", "#7BAFD4"))
+  table1 <- data1 %>%
+    gt() %>%
+    tab_header(title = html(title_header)) %>%
+    gt_highlight_rows(rows = c(15), fill = 'gray95') %>%
+    text_transform(locations = cells_body(vars(image)), fn = function(x) {web_image(url = x, height = px(35))}) %>%
+    cols_label(image = '', Player = md('**Player**'), Points = md('**PTS**'), Reb = md('**REB**'), Ast = md('**AST**'), Rim = md('**RIM**'), Rim. = md('**RIM%**'), Mid = md('**MID**'), Mid. = md('**MID%**'), Three = md('**3pt**'), Three. = md('**3pt%**'), Off_reb = md('**ORB**'), Def_reb = md('**DRB**'), Stl = md('**STL**'), Blk = md('**BLK**'), Tov = md('**TOV**'), Fouls = md('**FOULS**')) %>%
+    gt_add_divider(Ast, weight = px(3)) %>%
+    gt_add_divider(Rim.) %>%
+    gt_add_divider(Mid.) %>%
+    gt_add_divider(Off_reb, sides = 'left', weight = px(3)) %>%
+    data_color(columns = c(Rim.), palette = c("#ffffff", "#accfe8", "#7BAFD4")) %>%
+    data_color(columns = c(Mid.), palette = c("#ffffff", "#accfe8", "#7BAFD4")) %>%
+    data_color(columns = c(Three.), palette = c("#ffffff", "#accfe8", "#7BAFD4")) %>%
+    cols_align(columns = c(Points, Reb, Ast, Rim, Rim., Mid, Mid., Three, Three., Off_reb, Def_reb, Stl, Blk, Tov, Fouls), align = c('center')) %>%
+    tab_spanner(label = md('*Shooting*'), columns = c(Rim, Rim., Mid, Mid., Three, Three.))
+  data2 <- table2_funct(data)
+  title <- glue('Practice Stats')
+  subtitle <- glue('{format(Sys.Date(), "%m/%d/%Y")}')
+  title_header <- glue(
+    "<div style='display: flex; justify-content: space-between; align-items: center; background-color: #ffffff; padding: 10px; border-radius: 5px;'>
+      <div>
+        <img src='{tbl_image_df$UNC}' style='height: 65px; width: auto; vertical-align: middle;'>
+      </div>
+      <div style='flex-grow: 1; text-align: center;'>
+        <span style='font-family: Arial, sans-serif; font-weight: bold; font-size: 32px; line-height: 1.2; text-decoration: underline;'>{title}</span><br>
+        <span style='font-family: Arial, serif; font-size: 18px; font-weight: normal; line-height: 1.2; font-style: italic;'>{subtitle}
+          <img src='{tbl_image_df$Heel}' style='height: 40px; width: auto; vertical-align: middle; margin-left: 5px;'>
+        </span>
+      </div>
+      <div>
+        <img src='{tbl_image_df$Jordan}' style='height: 65px; width: auto; vertical-align: middle;'>
+      </div>
+    </div>"
+  )
+  custom_palette <- colorRampPalette(c("#ffffff", "#92bede", "#7BAFD4"))
+  table2 <- data2 %>%
+    gt() %>%
+    tab_header(title = html(title_header)) %>%
+    gt_highlight_rows(rows = c(15), fill = 'gray95') %>%
+    text_transform(locations = cells_body(vars(image)), fn = function(x) {web_image(url = x, height = px(35))}) %>%
+    cols_label(image = '', Player = md('**Player**'), Points = md('**PTS**'), Reb = md('**REB**'), Ast = md('**AST**'), FG = md('**FG**'), FG. = md('**FG%**'), Three = md('**3pt**'), Three. = md('**3pt%**'), Off_reb = md('**ORB**'), Def_reb = md('**DRB**'), Stl = md('**STL**'), Blk = md('**BLK**'), Tov = md('**TOV**'), Fouls = md('**FOULS**')) %>%
+    gt_add_divider(Ast, weight = px(3)) %>%
+    gt_add_divider(FG.) %>%
+    gt_add_divider(Off_reb, sides = 'left', weight = px(3)) %>%
+    data_color(columns = c(FG.), palette = c("#ffffff", "#accfe8", "#7BAFD4")) %>%
+    data_color(columns = c(Three.), palette = c("#ffffff", "#accfe8", "#7BAFD4")) %>%
+    cols_align(columns = c(Points, Reb, Ast, FG, FG., Three, Three., Off_reb, Def_reb, Stl, Blk, Tov, Fouls), align = c('center')) %>%
+    tab_spanner(label = md('*Shooting*'), columns = c(FG, FG., Three, Three.))
+}
+table1
+table2
+gtsave(data = table, filename = 'test.png')
+#```
+
+daily saves
+```{r}
+if (Daily == TRUE) {
+  data <- read_excel(path, 2)
+  data <- data[-c(1,17:31),]
+  data <- cbind(as.data.frame(urls), data)
+  data <- rename1(data)
+  THE_DAILY_CSV <- data
+  data <- daily_csvs(data)
+  write.csv(data, paste0(format(Sys.Date(), '%Y-%m-%d'), ' | Practice Stats.csv'))
+  
+  #write.csv(THE_DAILY_CSV[1,], 'Sydney Barker | Daily Practice.csv')
+  Syd <- read.csv('Shiny/UNC_WBB_24-25Prac/Sydney Barker | Daily Practice.csv')
+  Syd <- Syd[,-1]
+  player_cols <- Syd[1,(1:2)]
+  Syd <- Syd[,-c(1:2)]
+  Syd <- player_csv3(Syd)
+  current_data <- THE_DAILY_CSV[1,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Syd <- rbind(Syd, (current_data+tail(Syd,1)))
+  Syd <- player_csv2(Syd)
+  Syd <- cbind(player_cols, Syd)
+  write.csv(Syd, 'Sydney Barker | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[2,], 'Trayanna Crisp | Daily Practice.csv')
+  Crisp <- read.csv('Shiny/UNC_WBB_24-25Prac/Trayanna Crisp | Daily Practice.csv')
+  Crisp <- Crisp[,-1]
+  player_cols <- Crisp[1,(1:2)]
+  Crisp <- Crisp[,-c(1:2)]
+  Crisp <- player_csv3(Crisp)
+  current_data <- THE_DAILY_CSV[2,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Crisp <- rbind(Crisp, (current_data+tail(Crisp,1)))
+  Crisp <- player_csv2(Crisp)
+  Crisp <- cbind(player_cols, Crisp)
+  write.csv(Crisp, 'Trayanna Crisp | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[3,], 'Lexi Donarski | Daily Practice.csv')
+  Lexi <- read.csv('Shiny/UNC_WBB_24-25Prac/Lexi Donarski | Daily Practice.csv')
+  Lexi <- Lexi[,-1]
+  player_cols <- Lexi[1,(1:2)]
+  Lexi <- Lexi[,-c(1:2)]
+  Lexi <- player_csv3(Lexi)
+  current_data <- THE_DAILY_CSV[3,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Lexi <- rbind(Lexi, (current_data+tail(Lexi,1)))
+  Lexi <- player_csv2(Lexi)
+  Lexi <- cbind(player_cols, Lexi)
+  write.csv(Lexi, 'Lexi Donarski | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[4,], 'Maria Gakdeng | Daily Practice.csv')
+  Maria <- read.csv('Shiny/UNC_WBB_24-25Prac/Maria Gakdeng | Daily Practice.csv')
+  Maria <- Maria[,-1]
+  player_cols <- Maria[1,(1:2)]
+  Maria <- Maria[,-c(1:2)]
+  Maria <- player_csv3(Maria)
+  current_data <- THE_DAILY_CSV[4,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Maria <- rbind(Maria, (current_data+tail(Maria,1)))
+  Maria <- player_csv2(Maria)
+  Maria <- cbind(player_cols, Maria)
+  write.csv(Maria, 'Maria Gakdeng | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[5,], 'Lanie Grant | Daily Practice.csv')
+  Lanie <- read.csv('Shiny/UNC_WBB_24-25Prac/Lanie Grant | Daily Practice.csv')
+  Lanie <- Lanie[,-1]
+  player_cols <- Lanie[1,(1:2)]
+  Lanie <- Lanie[,-c(1:2)]
+  Lanie <- player_csv3(Lanie)
+  current_data <- THE_DAILY_CSV[5,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Lanie <- rbind(Lanie, (current_data+tail(Lanie,1)))
+  Lanie <- player_csv2(Lanie)
+  Lanie <- cbind(player_cols, Lanie)
+  write.csv(Lanie, 'Lanie Grant | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[6,], 'Laila Hull | Daily Practice.csv')
+  Laila <- read.csv('Shiny/UNC_WBB_24-25Prac/Laila Hull | Daily Practice.csv')
+  Laila <- Laila[,-1]
+  player_cols <- Laila[1,(1:2)]
+  Laila <- Laila[,-c(1:2)]
+  Laila <- player_csv3(Laila)
+  current_data <- THE_DAILY_CSV[6,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Laila <- rbind(Laila, (current_data+tail(Laila,1)))
+  Laila <- player_csv2(Laila)
+  Laila <- cbind(player_cols, Laila)
+  write.csv(Laila, 'Laila Hull | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[7,], 'Reniya Kelly | Daily Practice.csv')
+  Reniya <- read.csv('Shiny/UNC_WBB_24-25Prac/Reniya Kelly | Daily Practice.csv')
+  Reniya <- Reniya[,-1]
+  player_cols <- Reniya[1,(1:2)]
+  Reniya <- Reniya[,-c(1:2)]
+  Reniya <- player_csv3(Reniya)
+  current_data <- THE_DAILY_CSV[7,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Reniya <- rbind(Reniya, (current_data+tail(Reniya,1)))
+  Reniya <- player_csv2(Reniya)
+  Reniya <- cbind(player_cols, Reniya)
+  write.csv(Reniya, 'Reniya Kelly | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[8,], 'Kayla McPherson | Daily Practice.csv')
+  Kayla <- read.csv('Shiny/UNC_WBB_24-25Prac/Kayla McPherson | Daily Practice.csv')
+  Kayla <- Kayla[,-1]
+  player_cols <- Kayla[1,(1:2)]
+  Kayla <- Kayla[,-c(1:2)]
+  Kayla <- player_csv3(Kayla)
+  current_data <- THE_DAILY_CSV[8,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Kayla <- rbind(Kayla, (current_data+tail(Kayla,1)))
+  Kayla <- player_csv2(Kayla)
+  Kayla <- cbind(player_cols, Kayla)
+  write.csv(Kayla, 'Kayla McPherson | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[9,], 'Indya Nivar | Daily Practice.csv')
+  Indya <- read.csv('Shiny/UNC_WBB_24-25Prac/Indya Nivar | Daily Practice.csv')
+  Indya <- Indya[,-1]
+  player_cols <- Indya[1,(1:2)]
+  Indya <- Indya[,-c(1:2)]
+  Indya <- player_csv3(Indya)
+  current_data <- THE_DAILY_CSV[9,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Indya <- rbind(Indya, (current_data+tail(Indya,1)))
+  Indya <- player_csv2(Indya)
+  Indya <- cbind(player_cols, Indya)
+  write.csv(Indya, 'Indya Nivar | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[10,], 'Blanca Thomas | Daily Practice.csv')
+  Blanca <- read.csv('Shiny/UNC_WBB_24-25Prac/Blanca Thomas | Daily Practice.csv')
+  Blanca <- Blanca[,-1]
+  player_cols <- Blanca[1,(1:2)]
+  Blanca <- Blanca[,-c(1:2)]
+  Blanca <- player_csv3(Blanca)
+  current_data <- THE_DAILY_CSV[10,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Blanca <- rbind(Blanca, (current_data+tail(Blanca,1)))
+  Blanca <- player_csv2(Blanca)
+  Blanca <- cbind(player_cols, Blanca)
+  write.csv(Blanca, 'Blanca Thomas | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[11,], "Ciera Toomey | Daily Practice.csv")
+  Ciera <- read.csv("Shiny/UNC_WBB_24-25Prac/Ciera Toomey | Daily Practice.csv")
+  Ciera <- Ciera[,-1]
+  player_cols <- Ciera[1,(1:2)]
+  Ciera <- Ciera[,-c(1:2)]
+  Ciera <- player_csv3(Ciera)
+  current_data <- THE_DAILY_CSV[11,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Ciera <- rbind(Ciera, (current_data+tail(Ciera,1)))
+  Ciera <- player_csv2(Ciera)
+  Ciera <- cbind(player_cols, Ciera)
+  write.csv(Ciera, "Ciera Toomey | Daily Practice.csv")
+  
+  #write.csv(THE_DAILY_CSV[12,], 'Grace Townsend | Daily Practice.csv')
+  Grace <- read.csv('Shiny/UNC_WBB_24-25Prac/Grace Townsend | Daily Practice.csv')
+  Grace <- Grace[,-1]
+  player_cols <- Grace[1,(1:2)]
+  Grace <- Grace[,-c(1:2)]
+  Grace <- player_csv3(Grace)
+  current_data <- THE_DAILY_CSV[12,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Grace <- rbind(Grace, (current_data+tail(Grace,1)))
+  Grace <- player_csv2(Grace)
+  Grace <- cbind(player_cols, Grace)
+  write.csv(Grace, 'Grace Townsend | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[13,], 'Alyssa Ustby | Daily Practice.csv')
+  Alyssa <- read.csv('Shiny/UNC_WBB_24-25Prac/Alyssa Ustby | Daily Practice.csv')
+  Alyssa <- Alyssa[,-1]
+  player_cols <- Alyssa[1,(1:2)]
+  Alyssa <- Alyssa[,-c(1:2)]
+  Alyssa <- player_csv3(Alyssa)
+  current_data <- THE_DAILY_CSV[13,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Alyssa <- rbind(Alyssa, (current_data+tail(Alyssa,1)))
+  Alyssa <- player_csv2(Alyssa)
+  Alyssa <- cbind(player_cols, Alyssa)
+  write.csv(Alyssa, 'Alyssa Ustby | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[14,], 'Jordan Zubich | Daily Practice.csv')
+  Jordan <- read.csv('Shiny/UNC_WBB_24-25Prac/Jordan Zubich | Daily Practice.csv')
+  Jordan <- Jordan[,-1]
+  player_cols <- Jordan[1,(1:2)]
+  Jordan <- Jordan[,-c(1:2)]
+  Jordan <- player_csv3(Jordan)
+  current_data <- THE_DAILY_CSV[14,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Jordan <- rbind(Jordan, (current_data+tail(Jordan,1)))
+  Jordan <- player_csv2(Jordan)
+  Jordan <- cbind(player_cols, Jordan)
+  write.csv(Jordan, 'Jordan Zubich | Daily Practice.csv')
+  
+  #write.csv(THE_DAILY_CSV[15,], 'Totals | Daily Practice.csv')
+  Totals <- read.csv('Shiny/UNC_WBB_24-25Prac/Totals | Daily Practice.csv')
+  Totals <- Totals[,-1]
+  player_cols <- Totals[1,(1:2)]
+  Totals <- Totals[,-c(1:2)]
+  Totals <- player_csv3(Totals)
+  current_data <- THE_DAILY_CSV[15,]
+  current_data <- player_csv1(current_data[,-c(1:2)])
+  Totals <- rbind(Totals, (current_data+tail(Totals,1)))
+  Totals <- player_csv2(Totals)
+  Totals <- cbind(player_cols, Totals)
+  write.csv(Totals, 'Totals | Daily Practice.csv')
+  
+  path2 <- '/Users/gregorylederer/Desktop/UNC WBB/24-25 Prac/ShotCharts.xltm'
+  colnames <- c('Day', 'Week', 'Month', 'Rim_Make', 'Rim_Miss', 'Paint_Make', 'Paint_Miss', 'MidLC_Make', 'MidLC_Miss', 'MidLW_Make', 'MidLW_Miss', 'MidRW_Make', 'MidRW_Miss', 'MidRC_Make', 'MidRC_Miss', 'ThreeLC_Make', 'ThreeLC_Miss', 'ThreeLW_Make', 'ThreeLW_Miss', 'ThreeTop_Make', 'ThreeTop_Miss', 'ThreeRW_Make', 'ThreeRW_Miss', 'ThreeRC_Make', 'ThreeRC_Miss')
+  sheet_names <- excel_sheets(path2)[-1]
+  shotchart_data_list <- lapply(sheet_names, function(sheet) {
+    data <- read_excel(path2, sheet = sheet)
+    data <- data[-1, ]
+    colnames(data) <- colnames
+    data <- data %>%
+      mutate(across(4:25, as.numeric))
+    return(data)
+  })
+  names(shotchart_data_list) <- sheet_names
+  shotchart_data_list[['Totals']] <- bind_rows(shotchart_data_list)
+  lapply(names(shotchart_data_list), function(sheet_name) {
+    file_name <- paste0(sheet_name, " | Shot Chart Data.csv")
+    write_csv(shotchart_data_list[[sheet_name]], file_name)
+  })
+}
+
+#write.csv(THE_DAILY_CSV[15,], 'test.csv')
+#test <- read.csv('test.csv')
+#--
+# test <- test[,-1]
+# player_cols <- test[1,(1:2)]
+# test <- test[,-c(1:2)]
+# test <- player_csv3(test)
+# current_data <- THE_DAILY_CSV[15,]
+# current_data <- player_csv1(current_data[,-c(1:2)])
+# test <- rbind(test, (current_data+tail(test,1)))
+# test <- player_csv2(test)
+# test <- cbind(player_cols, test)
+#--
+#write.csv(test, 'test.csv')
+```
+
+WMT saves
+```{r}
+if (Weekly == TRUE) {
+  data <- read_excel(path, 3)
+  data <- data[-c(1,17:31),]
+  data <- cbind(as.data.frame(urls), data)
+  data <- rename1(data)
+  data <- WMT_csvs(data)
+  write.csv(data, paste0(Week, ' | Practice Stats.csv'))
+}
+
+if (Monthly == TRUE) {
+  data <- read_excel(path, 4)
+  data <- data[-c(1,17:31),]
+  data <- cbind(as.data.frame(urls), data)
+  data <- rename1(data)
+  data <- WMT_csvs(data)
+  write.csv(data, paste0(Month, ' | Practice Stats.csv'))
+}
+
+if (Total == TRUE) {
+  data <- read_excel(path, 5)
+  data <- data[-c(1,17:31),]
+  data <- cbind(as.data.frame(urls), data)
+  data <- rename1(data)
+  data <- WMT_csvs(data)
+  write.csv(data, 'Total Practice Stats.csv')
+}
+```
+

@@ -1,0 +1,903 @@
+---
+title: "INivar"
+author: "Greg"
+date: "2025-02-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB/Projects/Nivar")
+```
+
+#packages
+```{r}
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(readxl)
+library(gt)
+library(gtExtras)
+library(glue)
+# source('https://gist.github.com/andreweatherman/0a81c7122a133a015583587573a123ff/raw/4cd6b9db1d39c46e1b93b069bc801e4eac846b19/gt_plt_bar_pct.R')
+library(ggplot2)
+library(ggpmisc)
+library(rvest)
+library(readr)
+library(httr)
+library(reshape2)
+library(scales)
+```
+
+#data
+```{r}
+path <- '/Users/gregorylederer/Desktop/UNC WBB/Projects/Nivar/Nivar_Stats.xlsx'
+
+Adv_Conf <- read_excel(path, sheet = 1)
+Per40_Conf <- read_excel(path, sheet = 2)
+SynergyPlayer <- read_excel(path, sheet = 3)
+SynergyTeam <- read_excel(path, sheet = 4)
+AllPlayers <- read_excel(path, sheet = 5)
+TMAdv_2425 <- read_excel(path, sheet = 6)
+OppAdv_2425 <- read_excel(path, sheet = 7)
+TMAdv_2324 <- read_excel(path, sheet = 8)
+OppAdv_2324 <- read_excel(path, sheet = 9)
+TMAdv_2223 <- read_excel(path, sheet = 10)
+OppAdv_2223 <- read_excel(path, sheet = 11)
+TMAdv_2122 <- read_excel(path, sheet = 12)
+OppAdv_2122 <- read_excel(path, sheet = 13)
+TM_DefNums <- read_excel(path, sheet = 14)
+
+player_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5105740.png&w=350&h=254'
+team_img <- 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/1200px-North_Carolina_Tar_Heels_logo.svg.png'
+primary_color <- '#7bafd4'
+secondary_color <- '#13294B'
+tertiary_color <- '#8D9092'
+conf_image <- 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Atlantic_Coast_Conference_logo.svg/2560px-Atlantic_Coast_Conference_logo.svg.png'
+
+grace_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4704116.png&h=80&w=110&scale=crop'
+alyssa_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4433489.png&h=80&w=110&scale=crop'
+blanca_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5238304.png&h=80&w=110&scale=crop'
+ciera_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5174425.png&h=80&w=110&scale=crop'
+lanie_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5238302.png&h=80&w=110&scale=crop'
+lexi_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4433409.png&h=80&w=110&scale=crop'
+maria_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/4898548.png&h=80&w=110&scale=crop'
+reniya_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5174423.png&h=80&w=110&scale=crop'
+trayanna_img <- 'https://a.espncdn.com/combiner/i?img=/i/headshots/womens-college-basketball/players/full/5105721.png&h=80&w=110&scale=crop'
+```
+
+#report card
+```{r, eval=F}
+#stat, value, ptile, team rank
+#PPP, eFG%, PPS, SSQ, SSM, Tov%, FTA/FGA
+#team rank of 10
+AllPlayers_ptile <- AllPlayers %>%
+  filter(GP>=10) %>%
+  mutate(across(c(PPP, `eFG%`, PPS, SSQ, SSM, `TO%`, `FTA/FGA`), percent_rank, .names = '{col}_ptile')) %>%
+  mutate(`TO%_ptile` = 1 - `TO%_ptile`)
+UNCPlayers_rank <- AllPlayers %>%
+  filter(Team == 'North Carolina Tar Heels') %>%
+  select(Player, PPP, `eFG%`, PPS, SSQ, SSM, `TO%`, `FTA/FGA`) %>%
+  mutate(
+    PPP_rank = rank(-PPP, ties.method = "min"),
+    `eFG%_rank` = rank(-`eFG%`, ties.method = "min"),
+    PPS_rank = rank(-PPS, ties.method = "min"),
+    SSQ_rank = rank(-SSQ, ties.method = "min"),
+    SSM_rank = rank(-SSM, ties.method = "min"),
+    `TO%_rank` = rank(`TO%`, ties.method = "min"),
+    `FTA/FGA_rank` = rank(-`FTA/FGA`, ties.method = "min")
+  )
+Nivar_ranks <- UNCPlayers_rank %>% filter(Player == 'Indya Nivar')
+Nivar_ptile <- AllPlayers_ptile %>% filter(Player == 'Indya Nivar')
+report_card_df <- data.frame(Stat = c('PTS per Possession', 'eFG%', 'Points per Shot (PPS)', 'Shot Quality (Expected PPS)', 'Shot Making (PPS Above Expectation)', 'TOV%', 'FTA/FGA'),
+                             Value = c(as.character(Nivar_ranks$PPP[1]), as.character(Nivar_ranks$`eFG%`[1]), as.character(Nivar_ranks$PPS[1]), as.character(Nivar_ranks$SSQ[1]), as.character(Nivar_ranks$SSM[1]), as.character(Nivar_ranks$`TO%`[1]), as.character(Nivar_ranks$`FTA/FGA`[1])),
+                             ptile = c(Nivar_ptile$PPP_ptile[1], Nivar_ptile$`eFG%_ptile`[1], Nivar_ptile$PPS_ptile[1], Nivar_ptile$SSQ_ptile[1], Nivar_ptile$SSM_ptile[1], Nivar_ptile$`TO%_ptile`[1], Nivar_ptile$`FTA/FGA_ptile`[1]),
+                             Rank = c(Nivar_ranks$PPP_rank[1], Nivar_ranks$`eFG%_rank`[1], Nivar_ranks$PPS_rank[1], Nivar_ranks$SSQ_rank[1], Nivar_ranks$SSM_rank[1], Nivar_ranks$`TO%_rank`[1], Nivar_ranks$`FTA/FGA_rank`[1]))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Advanced Offensive Report Card</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>Indya Nivar</span>
+    </div>
+  </div>"
+)
+report_card_tbl <- report_card_df %>%
+  gt() %>%
+  cols_label(Stat = md('**Stat**'), Value = md('**Value**'), ptile = md('**%tile Comp to NCAA Avg**'), Rank = md('**Team Rank**')) %>%
+  gt_bars(ptile, labels = TRUE, fill = primary_color, domain = 0:1, digits = 0) %>%
+  gt_add_divider(Stat, weight = px(1)) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(Stat)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(Value, ptile, Rank)), style = cell_text(align = 'center')) %>%
+  tab_header(title = html(title_header))
+report_card_tbl
+#gtsave(data = report_card_tbl, filename = 'Adv Off Report Card.png')
+```
+
+#win correlation
+```{r, eval=F}
+rename_columns <- function(df, prefix) {
+  df %>%
+    rename_with(~ ifelse(. %in% c("School", "W-L%"), ., paste0(prefix, .)))
+}
+process_and_join <- function(tm_df, opp_df, season) {
+  tm_df <- rename_columns(tm_df, "TM_")
+  opp_df <- rename_columns(opp_df, "Opp_")
+  joined_df <- full_join(tm_df, opp_df, by = c("School", "W-L%"))
+  return(joined_df)
+}
+Final_2425 <- process_and_join(TMAdv_2425, OppAdv_2425, "2425")
+Final_2324 <- process_and_join(TMAdv_2324, OppAdv_2324, "2324")
+Final_2223 <- process_and_join(TMAdv_2223, OppAdv_2223, "2223")
+Final_2122 <- process_and_join(TMAdv_2122, OppAdv_2122, "2122")
+Final_corr_df <- rbind(Final_2425, Final_2324, Final_2223, Final_2122)
+#--
+numeric_cols <- Final_corr_df %>%
+  select(-School, -`W-L%`) %>%
+  names()
+correlations <- sapply(numeric_cols, function(col) cor(Final_corr_df[[col]], Final_corr_df$`W-L%`, use = "complete.obs"))
+correlation_df <- data.frame(Statistic = names(correlations), Correlation = correlations) %>%
+  arrange(desc(abs(Correlation)))
+print(correlation_df)
+#top 6: TM TS%, TM eFG%, TM TOV%, TM TRB%, Opp TRB%, Opp eFG%
+plot_data <- Final_corr_df %>%
+  mutate(`W-L%` = `W-L%` * 100,
+         `TM_TS%` = `TM_TS%` * 100,
+         `TM_eFG%` = `TM_eFG%` * 100,
+         `Opp_eFG%` = `Opp_eFG%` * 100) %>% 
+  select(`W-L%`, `TM_TS%`, `TM_eFG%`, `TM_TOV%`, `TM_TRB%`, `Opp_TRB%`, `Opp_eFG%`) %>%
+  pivot_longer(cols = -`W-L%`, names_to = "Metric", values_to = "Value") %>%
+  mutate(Metric = case_when(
+    startsWith(Metric, "TM_") ~ paste("Team", sub("TM_", "", Metric)),
+    startsWith(Metric, "Opp_") ~ paste("Opponent", sub("Opp_", "", Metric))
+  ))
+corr_plot <- ggplot(plot_data, aes(x = Value, y = `W-L%`)) +
+  geom_point(color = secondary_color, alpha = 0.7) +
+  geom_smooth(method = "lm", color = primary_color, se = FALSE, linewidth = 1.2) +
+  facet_wrap(~ Metric, scales = "free_x") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) + 
+  scale_x_continuous(labels = scales::percent_format(scale = 1)) + 
+  theme_minimal() +
+  labs(title = "Correlation of 6 Leading Team Metrics with W-L%",
+       x = "Metric Value",
+       y = "Winning Percentage") +
+  theme(strip.text = element_text(size = 12, face = "bold"),
+        plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        axis.title = element_text(size = 12, face = "bold"))
+corr_plot
+#ggsave(plot = corr_plot, filename = 'WL Corr Plot.png')
+correlation_data <- Final_corr_df %>%
+  select(`W-L%`, `TM_TS%`, `TM_eFG%`, `TM_TOV%`, `TM_TRB%`, `Opp_TRB%`, `Opp_eFG%`) %>%
+  summarise(across(-`W-L%`, ~ cor(.x, `W-L%`, use = "complete.obs")^2)) %>%
+  pivot_longer(cols = everything(), names_to = "Stat", values_to = "Correlation") %>%
+  mutate(
+    Correlation = round(Correlation*100, 1),
+    Stat = case_when(
+      startsWith(Stat, "TM_") ~ paste("Team", sub("TM_", "", Stat)),
+      startsWith(Stat, "Opp_") ~ paste("Opponent", sub("Opp_", "", Stat))
+    )
+  ) %>%
+  arrange(desc(Correlation))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{team_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Winning% Correlation</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>6 Leading Team Metrics</span>
+      <br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>Using data from the 2021-22 season to current day</span>
+    </div>
+  </div>"
+)
+correlation_tbl <- correlation_data %>%
+  gt() %>%
+  tab_header(title = html(title_header)) %>%
+  cols_label(Stat = md("**Stat**"), Correlation = md("**Correlation Value**")) %>%
+  cols_align(align = "center", columns = "Correlation") %>%
+  tab_style(style = cell_text(weight = "bold", align = 'left'), locations = cells_body(columns = "Stat")) %>%
+  tab_style(style = cell_text(decorate = 'underline', align = 'center'), locations = cells_column_labels()) %>%
+  tab_style(style = cell_borders(sides = "right", color = "black", weight = px(1)), locations = cells_body(columns = "Stat"))
+correlation_tbl
+#gtsave(correlation_tbl, filename = 'Corr Tbl.png')
+```
+
+#plot
+```{r, eval=F}
+#efg% v tov%
+#49.6  52.5
+#TRB% v Player Def Rating
+AllPlayer_plot <- AllPlayers %>%
+  filter(GP>=10)
+avg_efg <- mean(AllPlayer_plot$`eFG%`, na.rm = TRUE)
+avg_to <- mean(AllPlayer_plot$`TO%`, na.rm = TRUE)
+efg_tov_plot <- ggplot(AllPlayer_plot, aes(x = `eFG%`, y = `TO%`)) +
+  geom_point(size = 3, color = secondary_color, alpha = 0.7) +
+  geom_point(aes(x = 49.6, y = 15.4), size = 5, fill = 'white', color = 'white') +
+  geom_point(data = subset(AllPlayers, Team == "North Carolina Tar Heels"),
+             aes(x = `eFG%`, y = `TO%`), 
+             size = 3, shape = 21, fill = primary_color, color = "black", stroke = 1.5) +
+  geom_point(data = subset(AllPlayers, Player == "Indya Nivar"),
+             aes(x = `eFG%`, y = `TO%`), 
+             size = 8, shape = 23, fill = primary_color, color = "black", stroke = 1.5) +
+  geom_vline(xintercept = avg_efg, linetype = "dotted", color = "black", size = 1) +
+  geom_hline(yintercept = avg_to, linetype = "dotted", color = "black", size = 1) +
+  scale_x_continuous(labels = function(x) paste0(x, "%")) +
+  scale_y_continuous(labels = function(y) paste0(y, "%")) +
+  theme_minimal() +
+  labs(title = "eFG% vs. TOV% Among all NCAA D1 WBB Players",
+       subtitle = 'Larger Diamond Point is Indya Nivar\nBlue Points are UNC Players\nWhite Point is the Teams Numbers',
+       x = "eFG%",
+       y = "TOV%") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 12)
+  )
+efg_tov_plot
+#ggsave(plot = efg_tov_plot, filename = 'eFG v TOV Plot.png', height = 7, width = 7)
+#--
+TM_DefNums <- TM_DefNums %>%
+  rename(`TOV%` = `TO%`,
+         `3pt%` = `3FG%`) %>%
+  arrange(PPP)
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{team_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Individual Defensive Stats</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>The More Blue the Better</span>
+      <br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>Sorted from Best in PPP to Worst</span>
+    </div>
+  </div>"
+)
+TM_Def_tbl <- TM_DefNums %>%
+  gt() %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(Player)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(PPP, `FG%`, `eFG%`, SSQ, PPS, SSM, `TOV%`, `3pt%`, `3PA/FGA`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(PPP), weight = px(1)) %>%
+  data_color(columns = vars(`FG%`), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$`FG%`), max(TM_DefNums$`FG%`)))) %>%
+  data_color(columns = vars(`eFG%`), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$`eFG%`), max(TM_DefNums$`eFG%`)))) %>%
+  data_color(columns = vars(SSQ), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$SSQ), max(TM_DefNums$SSQ)))) %>%
+  data_color(columns = vars(PPS), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$PPS), max(TM_DefNums$PPS)))) %>%
+  data_color(columns = vars(SSM), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$SSM), max(TM_DefNums$SSM)))) %>%
+  data_color(columns = vars(`TOV%`), colors = scales::col_numeric(palette = c("transparent", primary_color), domain = c(min(TM_DefNums$`TOV%`), max(TM_DefNums$`TOV%`)))) %>%
+  data_color(columns = vars(`3pt%`), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$`3pt%`), max(TM_DefNums$`3pt%`)))) %>%
+  data_color(columns = vars(`3PA/FGA`), colors = scales::col_numeric(palette = c(primary_color, 'transparent'), domain = c(min(TM_DefNums$`3PA/FGA`), max(TM_DefNums$`3PA/FGA`)))) %>%
+  tab_header(title = html(title_header))
+TM_Def_tbl
+#gtsave(TM_Def_tbl, filename = 'Team Def Table.png')
+```
+
+#on off
+```{r, eval=F}
+Grace <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 13.0, 75.0, 40.0, 2.0, 3.3, 2.6, 69,
+  "Without", 13.5, 46.7, 33.3, 0.9, 3.3, 1.8, 58
+)
+Trayanna <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 10.0, 60.0, 0.0, 0.0, 1.0, 2.0, -29,
+  "Without", 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, -54
+)
+Alyssa <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 14.6, 44.9, 42.9, 2.8, 9.9, 1.8, 76,
+  "Without", 10.6, 50.8, 20.0, 2.6, 9.0, 1.0, 59
+)
+Reniya <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 12.5, 47.6, 25.0, 0.9, 3.6, 1.0, 73,
+  "Without", 13.9, 47.5, 41.7, 0.9, 3.8, 2.9, 62
+)
+Lanie <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 14.8, 55.6, 29.6, 1.5, 2.3, 1.0, 68,
+  "Without", 14.8, 37.5, 28.0, 1.3, 3.3, 0.3, 68
+)
+Lexi <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 13.2, 40.0, 47.5, 0.4, 2.1, 1.9, 73,
+  "Without", 14.4, 44.4, 46.4, 0.1, 1.5, 0.2, 59
+)
+Maria <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 17.5, 58.2, 88.0, 5.1, 5.3, 1.1, 76,
+  "Without", 17.5, 57.9, 87.0, 4.0, 7.2, 1.1, 56
+)
+Ciera <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 9.2, 37.5, 12.5, 4.1, 9.2, 0.0, 49,
+  "Without", 7.3, 50.0, 25.0, 4.4, 1.5, 0.0, 53
+)
+Blanca <- tibble::tribble(
+  ~One, ~`PTS/40`, ~`2P%`, ~`3P%`, ~`ORB/40`, ~`DRB/40`, ~`STL/40`, ~`+/-`,
+  "With", 9.0, 46.7, 44.0, 1.9, 9.7, 0.0, 58,
+  "Without", 7.6, 42.9, 28.0, 3.4, 6.7, 1.7, 56
+)
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{grace_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Grace Townsend</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Grace_tbl <- Grace %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`PTS/40`), max(Grace$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`2P%`), max(Grace$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`3P%`), max(Grace$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`ORB/40`), max(Grace$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`DRB/40`), max(Grace$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`STL/40`), max(Grace$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Grace$`+/-`), max(Grace$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Grace_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{alyssa_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Alyssa Ustby</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Alyssa_tbl <- Alyssa %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`PTS/40`), max(Alyssa$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`2P%`), max(Alyssa$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`3P%`), max(Alyssa$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`ORB/40`), max(Alyssa$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`DRB/40`), max(Alyssa$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`STL/40`), max(Alyssa$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Alyssa$`+/-`), max(Alyssa$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Alyssa_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{blanca_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Blanca Thomas</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Blanca_tbl <- Blanca %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`PTS/40`), max(Blanca$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`2P%`), max(Blanca$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`3P%`), max(Blanca$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`ORB/40`), max(Blanca$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`DRB/40`), max(Blanca$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`STL/40`), max(Blanca$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Blanca$`+/-`), max(Blanca$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Blanca_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{ciera_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Ciera Toomey</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Ciera_tbl <- Ciera %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`PTS/40`), max(Ciera$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`2P%`), max(Ciera$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`3P%`), max(Ciera$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`ORB/40`), max(Ciera$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`DRB/40`), max(Ciera$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`STL/40`), max(Ciera$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Ciera$`+/-`), max(Ciera$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Ciera_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{lanie_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Lanie Grant</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Lanie_tbl <- Lanie %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`PTS/40`), max(Lanie$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`2P%`), max(Lanie$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`3P%`), max(Lanie$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`ORB/40`), max(Lanie$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`DRB/40`), max(Lanie$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`STL/40`), max(Lanie$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lanie$`+/-`), max(Lanie$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Lanie_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{lexi_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Lexi Donarski</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Lexi_tbl <- Lexi %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`PTS/40`), max(Lexi$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`2P%`), max(Lexi$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`3P%`), max(Lexi$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`ORB/40`), max(Lexi$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`DRB/40`), max(Lexi$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`STL/40`), max(Lexi$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Lexi$`+/-`), max(Lexi$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Lexi_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{maria_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Maria Gakdeng</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Maria_tbl <- Maria %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`PTS/40`), max(Maria$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`2P%`), max(Maria$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`3P%`), max(Maria$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`ORB/40`), max(Maria$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`DRB/40`), max(Maria$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`STL/40`), max(Maria$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Maria$`+/-`), max(Maria$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Maria_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{reniya_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Reniya Kelly</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Reniya_tbl <- Reniya %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`PTS/40`), max(Reniya$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`2P%`), max(Reniya$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`3P%`), max(Reniya$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`ORB/40`), max(Reniya$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`DRB/40`), max(Reniya$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`STL/40`), max(Reniya$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Reniya$`+/-`), max(Reniya$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Reniya_tbl
+
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: center; text-align: center;'>
+    <div style='text-align: center; margin-right: 10px;'>
+      <img src='{trayanna_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: center;'>
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Trayanna Crisp</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>With and Without Indya</span>
+    </div>
+    <div style='text-align: center; margin-left: 10px;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+  </div>"
+)
+Trayanna_tbl <- Trayanna %>%
+  gt() %>%
+  cols_label(One = '', `PTS/40` = 'PTS/40', `2P%` = '2pt%', `3P%` = '3pt%', `ORB/40` = 'ORB/40', `DRB/40` = 'DRB/40', `STL/40` = 'STL/40', `+/-` = '+/-') %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(columns = vars(One)), style = cell_text(align = 'left', weight = 'bold')) %>%
+  tab_style(locations = cells_body(columns = vars(`PTS/40`, `2P%`, `3P%`, `ORB/40`, `DRB/40`, `STL/40`, `+/-`)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(columns = vars(One), weight = px(1)) %>%
+  gt_add_divider(columns = vars(`STL/40`), weight = px(1)) %>%
+  data_color(columns = vars(`PTS/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`PTS/40`), max(Trayanna$`PTS/40`)))) %>%
+  data_color(columns = vars(`2P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`2P%`), max(Trayanna$`2P%`)))) %>%
+  data_color(columns = vars(`3P%`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`3P%`), max(Trayanna$`3P%`)))) %>%
+  data_color(columns = vars(`ORB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`ORB/40`), max(Trayanna$`ORB/40`)))) %>%
+  data_color(columns = vars(`DRB/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`DRB/40`), max(Trayanna$`DRB/40`)))) %>%
+  data_color(columns = vars(`STL/40`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`STL/40`), max(Trayanna$`STL/40`)))) %>%
+  data_color(columns = vars(`+/-`), colors = scales::col_numeric(palette = c('transparent', primary_color), domain = c(min(Trayanna$`+/-`), max(Trayanna$`+/-`)))) %>%
+  tab_header(title = html(title_header))
+Trayanna_tbl
+#--
+# gtsave(data = Grace_tbl, filename = 'Grace W&Wout Indya.png')
+# gtsave(data = Alyssa_tbl, filename = 'Alyssa W&Wout Indya.png')
+# gtsave(data = Blanca_tbl, filename = 'Blanca W&Wout Indya.png')
+# gtsave(data = Ciera_tbl, filename = 'Ciera W&Wout Indya.png')
+# gtsave(data = Lanie_tbl, filename = 'Lanie W&Wout Indya.png')
+# gtsave(data = Lexi_tbl, filename = 'Lexi W&Wout Indya.png')
+# gtsave(data = Maria_tbl, filename = 'Maria W&Wout Indya.png')
+# gtsave(data = Reniya_tbl, filename = 'Reniya W&Wout Indya.png')
+# gtsave(data = Trayanna_tbl, filename = 'Trayanna W&Wout Indya.png')
+```
+
+#combo tables
+```{r, eval=F}
+#players, PTS/40, FG%, 3P%, ORB/40, DREB/40, TOV/40
+fullteam_df <- data.frame(player = c('Overall'),
+                       pts1 = c(68.2),
+                       pts2 = c(72),
+                       fg1 = c(42.7),
+                       fg2 = c(71),
+                       three1 = c(32.5),
+                       three2 = c(66),
+                       orb1 = c(10.9),
+                       orb2 = c(49),
+                       drb1 = c(26.0),
+                       drb2 = c(74),
+                       tov1 = c(13.5),
+                       tov2 = c(89))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{team_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Full Team Stats</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>%tile's Relative to All D1 WBB Teams</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>For Conference Games</span>
+    </div>
+  </div>"
+)
+fullteam_tbl <- fullteam_df %>%
+  gt() %>%
+  cols_label(player = '', pts1 = '', pts2 = '', fg1 = '', fg2 = '', three1 = '', three2 = '', orb1 = '', orb2 = '', drb1 = '', drb2 = '', tov1 = '', tov2 = '') %>%
+  tab_spanner(label = md('**PTS/40**'), columns = vars(pts1, pts2)) %>%
+  tab_spanner(label = md('**FG%**'), columns = vars(fg1, fg2)) %>%
+  tab_spanner(label = md('**3pt%**'), columns = vars(three1, three2)) %>%
+  tab_spanner(label = md('**ORB/40**'), columns = vars(orb1, orb2)) %>%
+  tab_spanner(label = md('**DRB/40**'), columns = vars(drb1, drb2)) %>%
+  tab_spanner(label = md('**TOV/40**'), columns = vars(tov1, tov2)) %>%
+  tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = vars(player))) %>%
+  cols_align(align = c('center'), columns = vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2)) %>%
+  gt_add_divider(columns = vars(player, pts2, fg2, three2, orb2, drb2), weight = px(1)) %>%
+  data_color(columns = vars(pts2, fg2, three2, orb2, drb2, tov2), palette = c('transparent', primary_color), domain = c(0,100)) %>%
+  cols_width(player ~ px(125)) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2) ~ px(50))
+fullteam_tbl
+#gtsave(data = fullteam_tbl, filename = 'Full Team Nums.png')
+
+Ind_onoff_df <- data.frame(player = c('With Indya', 'Without Indya'),
+                       pts1 = c(69.8, 73.4),
+                       pts2 = c(76, 85),
+                       fg1 = c(42.9, 43.4),
+                       fg2 = c(71, 75),
+                       three1 = c(35.7, 32.5),
+                       three2 = c(88, 64),
+                       orb1 = c(12.7, 10.9),
+                       orb2 = c(79, 50),
+                       drb1 = c(26.5, 28.2),
+                       drb2 = c(78, 92),
+                       tov1 = c(13, 12.6),
+                       tov2 = c(90, 93))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Indya Nivar On/Off Numbers</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>%tile's Relative to All D1 WBB Players</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>For All Games</span>
+    </div>
+  </div>"
+)
+Ind_onoff_tbl <- Ind_onoff_df %>%
+  gt() %>%
+  cols_label(player = '', pts1 = '', pts2 = '', fg1 = '', fg2 = '', three1 = '', three2 = '', orb1 = '', orb2 = '', drb1 = '', drb2 = '', tov1 = '', tov2 = '') %>%
+  tab_spanner(label = md('**PTS/40**'), columns = vars(pts1, pts2)) %>%
+  tab_spanner(label = md('**FG%**'), columns = vars(fg1, fg2)) %>%
+  tab_spanner(label = md('**3pt%**'), columns = vars(three1, three2)) %>%
+  tab_spanner(label = md('**ORB/40**'), columns = vars(orb1, orb2)) %>%
+  tab_spanner(label = md('**DRB/40**'), columns = vars(drb1, drb2)) %>%
+  tab_spanner(label = md('**TOV/40**'), columns = vars(tov1, tov2)) %>%
+  tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = vars(player))) %>%
+  cols_align(align = c('center'), columns = vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2)) %>%
+  gt_add_divider(columns = vars(player, pts2, fg2, three2, orb2, drb2), weight = px(1)) %>%
+  data_color(columns = vars(pts2, fg2, three2, orb2, drb2, tov2), palette = c('transparent', primary_color), domain = c(0,100)) %>%
+  cols_width(player ~ px(125)) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2) ~ px(50))
+Ind_onoff_tbl
+#gtsave(data = Ind_onoff_tbl, filename = 'Indya On Off.png')
+
+start5_df <- data.frame(player = c('Starting 5'),
+                       pts1 = c(69.7),
+                       pts2 = c(61),
+                       fg1 = c(43.4),
+                       fg2 = c(57),
+                       three1 = c(32.9),
+                       three2 = c(51),
+                       orb1 = c(11.3),
+                       orb2 = c(58),
+                       drb1 = c(23.8),
+                       drb2 = c(44),
+                       tov1 = c(11.1),
+                       tov2 = c(82))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{team_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Starting 5 Numbers</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>%tile's Relative to All D1 WBB Lineups</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>For Conference Games</span>
+    </div>
+  </div>"
+)
+start5_tbl <- start5_df %>%
+  gt() %>%
+  cols_label(player = '', pts1 = '', pts2 = '', fg1 = '', fg2 = '', three1 = '', three2 = '', orb1 = '', orb2 = '', drb1 = '', drb2 = '', tov1 = '', tov2 = '') %>%
+  tab_spanner(label = md('**PTS/40**'), columns = vars(pts1, pts2)) %>%
+  tab_spanner(label = md('**FG%**'), columns = vars(fg1, fg2)) %>%
+  tab_spanner(label = md('**3pt%**'), columns = vars(three1, three2)) %>%
+  tab_spanner(label = md('**ORB/40**'), columns = vars(orb1, orb2)) %>%
+  tab_spanner(label = md('**DRB/40**'), columns = vars(drb1, drb2)) %>%
+  tab_spanner(label = md('**TOV/40**'), columns = vars(tov1, tov2)) %>%
+  tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = vars(player))) %>%
+  cols_align(align = c('center'), columns = vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2)) %>%
+  gt_add_divider(columns = vars(player, pts2, fg2, three2, orb2, drb2), weight = px(1)) %>%
+  data_color(columns = vars(pts2, fg2, three2, orb2, drb2, tov2), palette = c('transparent', primary_color), domain = c(0,100)) %>%
+  cols_width(player ~ px(125)) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2) ~ px(50))
+start5_tbl
+#gtsave(data = start5_tbl, filename = 'Starting 5 Nums.png')
+
+Ind_guards_df <- data.frame(player = c('With Reniya', 'With Grace'),
+                       pts1 = c(71.2, 65.8),
+                       pts2 = c(72, 49),
+                       fg1 = c(43.0, 42.1),
+                       fg2 = c(62, 53),
+                       three1 = c(45.7, 50.4),
+                       three2 = c(42, 77),
+                       orb1 = c(12.8, 13.8),
+                       orb2 = c(82, 91),
+                       drb1 = c(26.3, 24.2),
+                       drb2 = c(72, 40),
+                       tov1 = c(11.7, 16),
+                       tov2 = c(95, 34))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Indya Point Guard Pairings</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>%tile's Relative to All D1 WBB Lineups</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>For All Games</span>
+    </div>
+  </div>"
+)
+Ind_guards_tbl <- Ind_guards_df %>%
+  gt() %>%
+  cols_label(player = '', pts1 = '', pts2 = '', fg1 = '', fg2 = '', three1 = '', three2 = '', orb1 = '', orb2 = '', drb1 = '', drb2 = '', tov1 = '', tov2 = '') %>%
+  tab_spanner(label = md('**PTS/40**'), columns = vars(pts1, pts2)) %>%
+  tab_spanner(label = md('**FG%**'), columns = vars(fg1, fg2)) %>%
+  tab_spanner(label = md('**3pt%**'), columns = vars(three1, three2)) %>%
+  tab_spanner(label = md('**ORB/40**'), columns = vars(orb1, orb2)) %>%
+  tab_spanner(label = md('**DRB/40**'), columns = vars(drb1, drb2)) %>%
+  tab_spanner(label = md('**TOV/40**'), columns = vars(tov1, tov2)) %>%
+  tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = vars(player))) %>%
+  cols_align(align = c('center'), columns = vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2)) %>%
+  gt_add_divider(columns = vars(player, pts2, fg2, three2, orb2, drb2), weight = px(1)) %>%
+  data_color(columns = vars(pts2, fg2, three2, orb2, drb2, tov2), palette = c('transparent', primary_color), domain = c(0,100)) %>%
+  cols_width(player ~ px(125)) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2) ~ px(50))
+Ind_guards_tbl
+#gtsave(data = Ind_guards_tbl, filename = 'Indya With Guards.png')
+
+Ind_bigs_df <- data.frame(player = c('With Maria', 'With Ciera', 'With Blanca'),
+                       pts1 = c(73.2, 67.8, 56.5),
+                       pts2 = c(78, 58, 9),
+                       fg1 = c(45.2, 41.4, 37.3),
+                       fg2 = c(79, 46, 11),
+                       three1 = c(34.0, 39.7, 34.9),
+                       three2 = c(68, 97, 75),
+                       orb1 = c(12.8, 13.5, 10.1),
+                       orb2 = c(81, 89, 39),
+                       drb1 = c(25.6, 27.0, 28.8),
+                       drb2 = c(63, 80, 94),
+                       tov1 = c(12.3, 14.9, 17.9),
+                       tov2 = c(91, 55, 12))
+title_header <- glue(
+  "<div style='display: flex; align-items: center; justify-content: flex-start;'>
+    <div style='text-align: left;'>
+      <img src='{player_img}' style='height: 80px; width: auto; border-radius: 1px;'>
+    </div>
+    <div style='text-align: left; margin-left: 10px;'> <!-- Reduced margin-left -->
+      <span style='font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; text-decoration: underline;'>Indya Big Pairings</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>%tile's Relative to All D1 WBB Lineups</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold;'>For All Games</span>
+    </div>
+  </div>"
+)
+Ind_bigs_tbl <- Ind_bigs_df %>%
+  gt() %>%
+  cols_label(player = '', pts1 = '', pts2 = '', fg1 = '', fg2 = '', three1 = '', three2 = '', orb1 = '', orb2 = '', drb1 = '', drb2 = '', tov1 = '', tov2 = '') %>%
+  tab_spanner(label = md('**PTS/40**'), columns = vars(pts1, pts2)) %>%
+  tab_spanner(label = md('**FG%**'), columns = vars(fg1, fg2)) %>%
+  tab_spanner(label = md('**3pt%**'), columns = vars(three1, three2)) %>%
+  tab_spanner(label = md('**ORB/40**'), columns = vars(orb1, orb2)) %>%
+  tab_spanner(label = md('**DRB/40**'), columns = vars(drb1, drb2)) %>%
+  tab_spanner(label = md('**TOV/40**'), columns = vars(tov1, tov2)) %>%
+  tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = vars(player))) %>%
+  cols_align(align = c('center'), columns = vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2)) %>%
+  gt_add_divider(columns = vars(player, pts2, fg2, three2, orb2, drb2), weight = px(1)) %>%
+  data_color(columns = vars(pts2, fg2, three2, orb2, drb2, tov2), palette = c('transparent', primary_color), domain = c(0,100)) %>%
+  cols_width(player ~ px(125)) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(vars(pts1, pts2, fg1, fg2, three1, three2, orb1, orb2, drb1, drb2, tov1, tov2) ~ px(50))
+Ind_bigs_tbl
+#gtsave(data = Ind_bigs_tbl, filename = 'Indya With Bigs.png')
+
+
+```
+
+#starting 5 offensive eff lineups
+```{r, eval=T}
+#ts%, 3pt%, tov%, orb%, drb%
+s_lineup_stat_df <- data.frame(stat = c('TS%', '3pt%', 'TOV%', 'ORB%', 'DRB%'),
+                          `Indya` = c(52.9, 37.9, 13.2, 33, 71),
+                          `Lanie` = c(54.6, 22.2, 16.6, 34.2, 77.3),
+                          `Grace` = c(51.4, 33.3, 14.1, 27, 83.8))
+
+s_lineup_ptile_df <- data.frame(stat = c('TS%', '3pt%', 'TOV%', 'ORB%', 'DRB%'),
+                          `Indya` = c(59, 70, 85, 59, 54),
+                          `Lanie` = c(66, 23, 66, 65, 77),
+                          `Grace` = c(53, 59, 81, 38, 92))
+
+s_lineup_stat_long <- melt(s_lineup_stat_df, id.vars = "stat", variable.name = "Player", value.name = "Value")
+s_lineup_stat_long$stat <- factor(s_lineup_stat_long$stat, levels = c('TS%', '3pt%', 'TOV%', 'ORB%', 'DRB%'))
+stat_plot <- ggplot(s_lineup_stat_long, aes(x = stat, y = Value, fill = Player)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c(primary_color, secondary_color, tertiary_color)) +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(title = "5 Man Lineup Offensive Comparisons", x = "Stat", y = "Value", fill = "", subtitle = 'Subbing Each Player in Starting Lineup') +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 14),
+    axis.title.x = element_text(face = "bold", size = 14),
+    axis.title.y = element_text(face = "bold", size = 14),
+    legend.text = element_text(size = 14)
+  )
+stat_plot
+#ggsave(plot = stat_plot, filename = 'Starting Lineup Stat Comps.png', width = 7, height = 5)
+
+s_lineup_ptile_long <- melt(s_lineup_ptile_df, id.vars = "stat", variable.name = "Player", value.name = "Value")
+s_lineup_ptile_long$stat <- factor(s_lineup_ptile_long$stat, levels = c('TS%', '3pt%', 'TOV%', 'ORB%', 'DRB%'))
+ptile_plot <- ggplot(s_lineup_ptile_long, aes(x = stat, y = Value, fill = Player)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c(primary_color, secondary_color, tertiary_color)) +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(title = "5 Man Lineup Offensive Comparisons", x = "Stat", y = "%tile", fill = "", subtitle = 'Subbing Each Player in Starting Lineup\n%tile Relative to D1 WBB Lineups (0-100, 100 best)') +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 14),
+    axis.title.x = element_text(face = "bold", size = 14),
+    axis.title.y = element_text(face = "bold", size = 14),
+    legend.text = element_text(size = 14)
+  )
+ptile_plot
+#ggsave(plot = ptile_plot, filename = 'Starting Lineup Ptile Comps.png', width = 7, height = 5)
+```
+

@@ -1,0 +1,1036 @@
+---
+title: "SportReferenceScrapingFunctions"
+output: html_document
+date: "2025-03-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB")
+```
+
+#packages
+```{r}
+library(tidyverse)
+library(dplyr)
+library(htmltools)
+library(rvest)
+library(gt)
+library(gtExtras)
+library(glue)
+source('https://gist.github.com/andreweatherman/0a81c7122a133a015583587573a123ff/raw/4cd6b9db1d39c46e1b93b069bc801e4eac846b19/gt_plt_bar_pct.R')
+library(geomtextpath)
+library(ggplot2)
+library(gamezoneR)
+library(purrr)
+library(gridExtra)
+library(grid)
+library(png)
+library(lubridate)
+#grid.arrange
+```
+
+#data functions
+```{r}
+adv_school <- function(year=2025) {
+  url <- paste0('https://www.sports-reference.com/cbb/seasons/women/', year,'-advanced-school-stats.html')
+  web <- read_html(url) %>% html_table()
+  data <- data.frame(web)
+  return(data)
+}
+adv_opp <- function(year=2025) {
+  url <- paste0('https://www.sports-reference.com/cbb/seasons/women/', year,'-advanced-opponent-stats.html')
+  web <- read_html(url) %>% html_table()
+  data <- data.frame(web)
+  return(data)
+}
+reg_school <- function(year=2025) {
+  url <- paste0('https://www.sports-reference.com/cbb/seasons/women/', year, '-school-stats.html')
+  web <- read_html(url) %>% html_table()
+  data <- data.frame(web)
+  return(data)
+}
+reg_opp <- function(year=2025) {
+  url <- paste0('https://www.sports-reference.com/cbb/seasons/women/', year, '-opponent-stats.html')
+  web <- read_html(url) %>% html_table()
+  data <- data.frame(web)
+  return(data)
+}
+```
+
+#four factor report card
+```{r, eval=T}
+FindTeam_RC <- function(adv_school_data) {
+  data <- adv_school_data
+  colnames(data) <- data[1,]
+  data <- data[!(data$School == "School" | data$School == ""), colSums(!is.na(data)) > 0]
+  data <- data %>%
+    select(School, `eFG%`, `TOV%`, `ORB%`, `FT/FGA`)
+  return(print(data$School))
+}
+
+Team4FactReportCard <- function(select_school, adv_school_data, adv_opp_data) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == select_school | espn == select_school | ncaa == select_school)
+  team_logo <- team_stuff$logo_url
+  primary_color <- team_stuff$primary_color
+  conference <- team_stuff$conference
+  
+  conf_logos <- data.frame(`A-10` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Atlantic_10_Conference_logo.svg/2560px-Atlantic_10_Conference_logo.svg.png'),
+                           `A-Sun` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/ASUN_Primary_Mark.png/250px-ASUN_Primary_Mark.png'),
+                           AAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/American_Athletic_Conference_logo.svg/1200px-American_Athletic_Conference_logo.svg.png'),
+                           ACC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Atlantic_Coast_Conference_logo.svg/1200px-Atlantic_Coast_Conference_logo.svg.png'),
+                           `Am. East` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/America_East_Conference_logo_2024.svg/1200px-America_East_Conference_logo_2024.svg.png'),
+                           `Big 10` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Big_Ten_Conference_logo.svg/1200px-Big_Ten_Conference_logo.svg.png'),
+                           `Big 12` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Big_12_Conference_%28cropped%29_logo.svg/1200px-Big_12_Conference_%28cropped%29_logo.svg.png'),
+                           `Big East` = c('https://upload.wikimedia.org/wikipedia/commons/b/bb/Big_east_conf_logo.png'),
+                           `Big Sky` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Big_Sky_Conference_logo.svg/1200px-Big_Sky_Conference_logo.svg.png'),
+                           `Big South` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Big_South_Conference_logo_in_Presbyterian_colors.svg/1200px-Big_South_Conference_logo_in_Presbyterian_colors.svg.png'),
+                           `Big West` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Big_West_Conference_logo_2021.svg/220px-Big_West_Conference_logo_2021.svg.png'),
+                           `C-USA` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/CUSA_logo.svg/1280px-CUSA_logo.svg.png'),
+                           CAA = c('https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Coastal_Athletic_Association_logo.svg/1200px-Coastal_Athletic_Association_logo.svg.png'),
+                           Horizon = c('https://upload.wikimedia.org/wikipedia/commons/e/e5/Horizon_League_logo.svg'),
+                           Ivy = c('https://upload.wikimedia.org/wikipedia/commons/2/24/Ivy_league_simple_logo.png'),
+                           MAAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Metro_Atlantic_Athletic_Conference_logo.svg/1200px-Metro_Atlantic_Athletic_Conference_logo.svg.png'),
+                           MAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Mid-American_Conference_logo.svg/1200px-Mid-American_Conference_logo.svg.png'),
+                           MEAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Mid-Eastern_Athletic_Conference_logo.svg/1200px-Mid-Eastern_Athletic_Conference_logo.svg.png'),
+                           MVC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Missouri_Valley_Conference_logo.svg/800px-Missouri_Valley_Conference_logo.svg.png'),
+                           MWC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Mountain_West_Conference_logo.svg/1200px-Mountain_West_Conference_logo.svg.png'),
+                           NEC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Northeast_Conference_logo.svg/1200px-Northeast_Conference_logo.svg.png'),
+                           OVC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Ohio_Valley_Conference_logo.svg/1200px-Ohio_Valley_Conference_logo.svg.png'),
+                           `Pac 12` = c('https://upload.wikimedia.org/wikipedia/en/thumb/a/ac/Pac-12_logo.svg/1200px-Pac-12_logo.svg.png'),
+                           Patriot = c('https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Patriot_league_conference_logo.svg/800px-Patriot_league_conference_logo.svg.png'),
+                           SEC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Southeastern_Conference_logo_%282024%29.svg/1200px-Southeastern_Conference_logo_%282024%29.svg.png'),
+                           Southern = c('https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Southern_Conference_logo.svg/1200px-Southern_Conference_logo.svg.png'),
+                           Southland = c('https://upload.wikimedia.org/wikipedia/en/thumb/5/5d/Southland_Conference_logo.svg/2560px-Southland_Conference_logo.svg.png'),
+                           Summit = c('https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Summit_League_logo.svg/800px-Summit_League_logo.svg.png'),
+                           Sunbelt = c('https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Sun_Belt_Conference_2020_logo_and_name.svg/2560px-Sun_Belt_Conference_2020_logo_and_name.svg.png'),
+                           SWAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Southwestern_Athletic_Conference_logo.svg/2560px-Southwestern_Athletic_Conference_logo.svg.png'),
+                           WAC = c('https://upload.wikimedia.org/wikipedia/commons/f/f5/Logo_WAC.png'),
+                           WCC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/West_Coast_Conference_logo_2019_with_name.svg/1200px-West_Coast_Conference_logo_2019_with_name.svg.png'))
+  conf_logos <- conf_logos %>%
+    rename(`A-10` = A.10,
+           `A-Sun` = A.Sun,
+           `Am. East` = Am..East,
+           `Big 10` = Big.10,
+           `Big 12` = Big.12,
+           `Big East` = Big.East,
+           `Big Sky` = Big.Sky,
+           `Big South` = Big.South,
+           `Big.West` = Big.West,
+           `C-USA` = C.USA,
+           `Pac 12` = Pac.12)
+  
+  conference_logo <- conf_logos[[conference]]
+  
+  data1 <- adv_school_data
+  colnames(data1) <- data1[1,]
+  data1 <- data1[!(data1$School == "School" | data1$School == ""), colSums(!is.na(data1)) > 0]
+  data1 <- data1 %>%
+    mutate(`eFG%` = as.numeric(`eFG%`),
+           `TOV%` = as.numeric(`TOV%`),
+           `ORB%` = as.numeric(`ORB%`),
+           `FT/FGA` = as.numeric(`FT/FGA`)) %>%
+    select(School, `eFG%`, `TOV%`, `ORB%`, `FT/FGA`)
+
+  data2 <- adv_opp_data
+  colnames(data2) <- data2[1,]
+  data2 <- data2[!(data2$School == "School" | data2$School == ""), colSums(!is.na(data2)) > 0]
+  data2 <- data2 %>%
+    mutate(`eFG%` = as.numeric(`eFG%`),
+           `TOV%` = as.numeric(`TOV%`),
+           `ORB%` = as.numeric(`ORB%`),
+           `FT/FGA` = as.numeric(`FT/FGA`)) %>%
+    select(School, `eFG%`, `TOV%`, `ORB%`, `FT/FGA`)
+  
+  data1$School <- gsub("\\s*NCAA\\s*$", "", data1$School, perl = TRUE)
+  data1$School <- gsub("[\u00A0\u2002\u2003]+$", "", data1$School)
+  data1$School <- trimws(data1$School)
+  
+  data2$School <- gsub("\\s*NCAA\\s*$", "", data2$School, perl = TRUE)
+  data2$School <- gsub("[\u00A0\u2002\u2003]+$", "", data2$School)
+  data2$School <- trimws(data2$School)
+  
+  if (!(select_school %in% data1$School)) {
+    stop("Selected school not found in one of the datasets, go to: https://www.sports-reference.com/cbb/seasons/women/2025-advanced-school-stats.html")
+  }
+
+  reverse_col1 <- 'TOV%_'
+  data1 <- data1 %>%
+    mutate(across(c(`eFG%`, `TOV%`, `ORB%`, `FT/FGA`), percent_rank, .names = '{col}_ptile')) %>%
+    mutate(across(starts_with(c(reverse_col1)), ~1-.x))
+  team1 <- data1 %>% filter(School == select_school)
+  team1 <- team1 %>%
+    mutate(
+      `eFG%` = round(`eFG%`*100,1),
+      `FT/FGA` = round(`FT/FGA`*100,1)
+    )
+
+  reverse_col2 <- c('eFG%_', 'ORB%_', 'FT/FGA_')
+  data2 <- data2 %>%
+    mutate(across(c(`eFG%`, `TOV%`, `ORB%`, `FT/FGA`), percent_rank, .names = '{col}_ptile')) %>%
+    mutate(across(starts_with(reverse_col2), ~1-.x))
+  team2 <- data2 %>% filter(School == select_school)
+  team2 <- team2 %>%
+    mutate(
+      `eFG%` = round(`eFG%`*100,1),
+      `FT/FGA` = round(`FT/FGA`*100,1)
+    )
+
+  final_tbl <- data.frame(group = rep(c("Offense", "Defense"), each = 4),
+                          stat = c('eFG%', 'TOV%', 'ORB%','FT/FGA', 'eFG%', 'TOV%', 'ORB%','FT/FGA'),
+                          value = c(team1$`eFG%`[1], team1$`TOV%`[1], team1$`ORB%`[1], team1$`FT/FGA`[1], team2$`eFG%`[1], team2$`TOV%`[1], team2$`ORB%`[1], team2$`FT/FGA`[1]),
+                          ptile = c(team1$`eFG%_ptile`[1], team1$`TOV%_ptile`[1], team1$`ORB%_ptile`[1], team1$`FT/FGA_ptile`[1], team2$`eFG%_ptile`[1], team2$`TOV%_ptile`[1], team2$`ORB%_ptile`[1], team2$`FT/FGA_ptile`[1])
+  ) %>%
+    mutate(rating = case_when(
+      ptile < 0.2 ~ "Very Poor",
+      ptile < 0.35 ~ "Weak",
+      ptile < 0.5 ~ "Below Average",
+      ptile < 0.6 ~ "Average",
+      ptile < 0.75 ~ "Above Average",
+      ptile < 0.9 ~ "Very Good",
+      ptile >= 0.9 ~ "Elite",
+      TRUE ~ NA_character_)
+    )
+
+  title_header <- glue(
+    "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{team_logo}' style='height: 50px; width: auto; border-radius: 5px;'>
+    </div>
+    <div style='text-align: center; flex-grow: 1;'>
+      <span style='font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; text-decoration: underline;'>Four Factors</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 20px; font-weight: bold;'>Overall Report Card</span>
+    </div>
+    <div style='text-align: right;'>
+      <img src='{conference_logo}' style='height: 40px; width: auto; border-radius: 5px;'>
+    </div>
+  </div>"
+  )
+  gt_tbl <- final_tbl %>%
+    group_by(group) %>%
+    gt() %>%
+    tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 20, decorate = 'underline', weight = 'bold'))) %>%
+    cols_label(stat = md('**Stat**'), value = md('**Value**'), ptile = md('**%tile Comp. to NCAA Avg.**'), rating = md('**Rating**')) %>%
+    tab_style(locations = cells_body(columns = stat), style = cell_text(weight = 'bold', align = 'left')) %>%
+    tab_style(locations = cells_body(columns = rating), style = cell_text(decorate = 'underline')) %>%
+    gt_bars(ptile, labels = TRUE, fill = primary_color, domain = 0:1, digits = 0) %>%
+    cols_align(columns = vars(value, ptile, rating), align = 'center') %>%
+    gt_add_divider(stat, weight = px(1.5)) %>%
+    gt_add_divider(ptile, weight = px(1.5)) %>%
+    cols_width(stat ~ px(80)) %>%
+    tab_style(locations = cells_column_labels(), style = cell_text(decorate = 'underline', size = px(18))) %>%
+    cols_width(value ~ px(70)) %>%
+    tab_header(title = html(title_header))
+
+  return(gt_tbl)
+}
+#FindTeam_RC()
+#Team4FactReportCard(select_school = 'Michigan State')
+```
+
+#team wheel
+```{r,eval=T}
+TeamWheel <- function(select_school, reg_school_data, reg_opp_data) {
+  team_stuff <- mbb_team_info
+  team_stuff <- team_stuff %>%
+    filter(team_name == select_school | espn == select_school | ncaa == select_school)
+  primary_color <- team_stuff$primary_color
+  secondary_color <- team_stuff$secondary_color
+  tertiary_color <- team_stuff$tertiary_color
+  
+  if (is.na(secondary_color) || secondary_color == '#FFFFFF') {
+    secondary_color <- 'grey70'
+  } else if (secondary_color == '#000000') {
+    secondary_color <- 'grey15'
+  }
+  
+  if (is.na(tertiary_color) || tertiary_color == '#FFFFFF') {
+    tertiary_color <- 'grey70'
+  } else if (tertiary_color == '#000000') {
+    tertiary_color <- 'grey15'
+  }
+  
+  data1 <- reg_school_data
+  colnames(data1) <- data1[1,]
+  data1 <- data1[!(data1$School == "School" | data1$School == ""), colSums(!is.na(data1)) > 0]
+  data1[, 15:33] <- lapply(data1[, 15:33], as.numeric)
+  data1 <- data1 %>%
+    mutate(ORtg = round((Tm./(FGA+TOV-ORB))*100,1),
+           TPAr = round((`3PA`/FGA)*100,1),
+           ORB = round((ORB/(FGA+TOV-ORB))*100,1),
+           TRB = round((TRB/(FGA+TOV-ORB))*100,1),
+           STL = round((STL/(FGA+TOV-ORB))*100,1),
+           TS. = round((Tm./(2*(FGA+(0.44*FTA))))*100,1),
+           FT. = round((FT/FTA)*100,1)) %>%
+    select(School, ORtg, TPAr, ORB, TRB, STL, TS., FT.)
+  
+  data2 <- reg_opp_data
+  colnames(data2) <- data2[1,]
+  data2 <- data2[!(data2$School == "School" | data2$School == ""), colSums(!is.na(data2)) > 0]
+  data2[, 15:33] <- lapply(data2[, 15:33], as.numeric)
+  data2 <- data2 %>%
+    mutate(DRtg =round((Opp./(FGA+TOV-ORB))*100,1)) %>%
+    select(School, DRtg)
+  
+  data <- data1 %>%
+    left_join(data2, by = 'School')
+  
+  data <- data %>%
+    mutate(across(c(ORtg, TPAr, ORB, TRB, STL, TS., FT., DRtg), percent_rank, .names = '{col}_ptile'))
+  
+  data <- data %>%
+    mutate(DRtg_ptile = 1-DRtg_ptile)
+  
+  data$School <- gsub("\\s*NCAA\\s*$", "", data$School, perl = TRUE)
+  data$School <- gsub("[\u00A0\u2002\u2003]+$", "", data$School)
+  data$School <- trimws(data$School)
+  
+  data <- data %>%
+    filter(School == select_school) %>%
+    select(ends_with('_ptile')) %>%
+    mutate(ORTG = round(ORtg_ptile*100,1),
+           DRTG = round(DRtg_ptile*100,1),
+           `TS%` = round(TS._ptile*100,1),
+           `FT%` = round(FT._ptile*100,1),
+           `3PAr` = round(TPAr_ptile*100,1),
+           ORB = round(ORB_ptile*100,1),
+           TRB = round(TRB_ptile*100,1),
+           STL = round(STL_ptile*100,1)) %>%
+    select(ORTG, DRTG, `TS%`, `FT%`, `3PAr`, ORB, TRB, STL)
+  
+  wheel_df <- data.frame(
+    index = 1:8,
+    stat = c('ORTG', 'DRTG', 'TS%', 'FT%', '3PAr', 'ORB', 'TRB', 'STL'),
+    value = c(data$ORTG, data$DRTG, data$`TS%`, data$`FT%`, data$`3PAr`, data$ORB, data$TRB, data$STL)
+  )
+  
+  wheel_df <- wheel_df %>%
+    mutate(type = case_when(
+      index %in% 1:2 ~ "Overall",
+      index %in% 3:5 ~ "Shooting",
+      index %in% 6:8 ~ "Other"
+    ))
+  
+  wheel_df$index <- as.numeric(wheel_df$index)
+  wheel_df$value <- as.numeric(wheel_df$value)
+  
+  wheel_df$type <- factor(wheel_df$type, levels = c('Overall', 'Shooting', 'Other'))
+  
+  title_text <- paste0(select_school ,' %tiles Comp. to NCAA')
+  subtitle_text <- paste0('Stat Wheel (%tile Based)')
+  
+  wheel_plot <- ggplot(data = wheel_df, aes(x = reorder(stat, index), y = value, label = value, fill = type)) +
+    geom_bar(data = wheel_df, width = 1, color = 'white', stat = 'identity') +
+    coord_curvedpolar() +
+    geom_bar(aes(y=100, fill=type), stat='identity', width=1, alpha=0.5) +
+    geom_hline(yintercept = seq(0,100,by = 100),color = 'white', size=1) +
+    geom_vline(xintercept = seq(.5,10,by=1),color = 'white',size=0.5) +
+    geom_label(color = 'black', fill = 'white', size=3.5, fontface='bold', show.legend = FALSE) +
+    scale_fill_manual(values = c(primary_color,secondary_color,tertiary_color)) +
+    labs(title = title_text, subtitle = subtitle_text) +
+    theme(legend.position = "none",
+          legend.direction = "vertical",
+          legend.background = element_rect(fill = "white", color="white"),
+          legend.title = element_blank(),
+          legend.text = element_text(colour = "black", face = "bold", size = 8),
+          legend.key.size = unit(.5, "cm"),
+          legend.box.spacing = unit(0, "mm"),
+          plot.title = element_text(hjust = .5, colour = "black", face = "bold", size = 12),
+          plot.subtitle = element_text(hjust = .5, colour = "black", size = 10),
+          plot.background = element_rect(fill = "white", color="white"),
+          panel.background = element_rect(fill = "white", color="white"),
+          panel.grid = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text = element_text(face = "bold", size = 11, colour = "black"),
+          axis.title = element_blank(),
+          axis.text.x = element_text(face = "bold", size = 11, vjust = 0.45))
+  return(wheel_plot)
+}
+#TeamWheel(select_school = 'Michigan State')
+
+TeamWheel_Values <- function(select_school, reg_school_data, reg_opp_data) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == select_school | espn == select_school | ncaa == select_school)
+  team_logo <- team_stuff$logo_url
+  
+  data1 <- reg_school_data
+  colnames(data1) <- data1[1,]
+  data1 <- data1[!(data1$School == "School" | data1$School == ""), colSums(!is.na(data1)) > 0]
+  data1[, 15:33] <- lapply(data1[, 15:33], as.numeric)
+  data1 <- data1 %>%
+    mutate(ORtg = round((Tm./(FGA+TOV-ORB))*100,1),
+           TPAr = round((`3PA`/FGA)*100,1),
+           ORB = round((ORB/(FGA+TOV-ORB))*100,1),
+           TRB = round((TRB/(FGA+TOV-ORB))*100,1),
+           STL = round((STL/(FGA+TOV-ORB))*100,1),
+           TS. = round((Tm./(2*(FGA+(0.44*FTA))))*100,1),
+           FT. = round((FT/FTA)*100,1)) %>%
+    select(School, ORtg, TPAr, ORB, TRB, STL, TS., FT.)
+  
+  data2 <- reg_opp_data
+  colnames(data2) <- data2[1,]
+  data2 <- data2[!(data2$School == "School" | data2$School == ""), colSums(!is.na(data2)) > 0]
+  data2[, 15:33] <- lapply(data2[, 15:33], as.numeric)
+  data2 <- data2 %>%
+    mutate(DRtg =round((Opp./(FGA+TOV-ORB))*100,1)) %>%
+    select(School, DRtg)
+  
+  data <- data1 %>%
+    left_join(data2, by = 'School')
+  
+  data$School <- gsub("\\s*NCAA\\s*$", "", data$School, perl = TRUE)
+  data$School <- gsub("[\u00A0\u2002\u2003]+$", "", data$School)
+  data$School <- trimws(data$School)
+  
+  data <- data %>%
+    filter(School == select_school) %>%
+    rename(ORTG = ORtg,
+           DRTG = DRtg,
+           `TS%` = TS.,
+           `FT%` = FT.,
+           `3PAr` = TPAr,
+           `ORB / 100poss` = ORB,
+           `TRB / 100poss` = TRB,
+           `STL / 100poss` = STL) %>%
+    select(-1) %>%
+    pivot_longer(everything(),
+                 names_to = "name", 
+                 values_to = "value")
+  
+  custom_order <- c('ORTG', 'DRTG', 'TS%', 'FT%', '3PAr', 'ORB / 100poss', 'TRB / 100poss', 'STL / 100poss')
+  data <- data %>%
+    mutate(name = factor(name, levels = custom_order)) %>%
+    arrange(name)
+  
+  title_header <- glue(
+    "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{team_logo}' style='height: 35px; width: auto; border-radius: 5px;'>
+    </div>
+    <div style='text-align: center; flex-grow: 1;'>
+      <span style='font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; text-decoration: underline;'>Wheel Values</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;'>%tiles Relative to NCAA Seen on Wheel Graph</span>
+    </div>
+  </div>"
+  )
+  tbl <- data %>%
+    gt() %>%
+    cols_label(name = md('**Stat**'), value = md('**Value**')) %>%
+    tab_style(style = cell_text(align = 'left', weight = 'bold', size = 6), locations = cells_body(columns = c(name))) %>%
+    tab_style(style = cell_text(align = 'center', size = 6), locations = cells_body(columns = c(value))) %>%
+    tab_style(style = cell_text(align = 'center', decorate = 'underline'), locations = cells_column_labels()) %>%
+    gt_add_divider(name, weight = px(1)) %>%
+    cols_width(name ~ px(125), value ~ px(100)) %>%
+    tab_header(title = html(title_header))
+  return(tbl)
+}
+#TeamWheel_Values(select_school = 'Michigan State')
+```
+
+#column comps
+```{r}
+ColumnComparison <- function(stat = c('PPG', 'PPP', 'Pace', 'eFG%', 'Turnover Rate', 'FTAr', 'ORB%', 'TRB%'), off_team, def_team, reg_school_data, adv_school_data, reg_opp_data, adv_opp_data) {
+  if (stat == 'eFG%') {
+    select_stat <- 'eFG'
+  } else if (stat == 'Turnover Rate') {
+    select_stat <- 'tovr'
+  } else if (stat == 'ORB%') {
+    select_stat <- 'ORBr'
+  } else if (stat == 'TRB%') {
+    select_stat <- 'TRBr'
+  } else {
+    select_stat <- stat
+  }
+  
+  off_team_stuff <- mbb_team_info
+  off_team_stuff <- off_team_stuff %>%
+    filter(team_name == off_team | espn == off_team | ncaa == off_team)
+  off_team_color <- off_team_stuff$primary_color
+  
+  def_team_stuff <- mbb_team_info
+  def_team_stuff <- def_team_stuff %>%
+    filter(team_name == def_team | espn == def_team | ncaa == def_team)
+  def_team_color <- def_team_stuff$primary_color
+  
+  data1 <- reg_school_data
+  colnames(data1) <- data1[1,]
+  data1 <- data1[!(data1$School == "School" | data1$School == ""), colSums(!is.na(data1)) > 0]
+  data1[, c(3, 15:33)] <- lapply(data1[, c(3, 15:33)], as.numeric)
+  data1 <- data1 %>%
+    mutate(Off_PPG = round(Tm./G,1),
+           Off_PPP = round((Tm./(FGA+TOV-ORB)),3),
+           Off_Pace = round((FGA+TOV-ORB)/G,1),
+           Off_eFG = round(((FG+(0.5*`3P`))/FGA)*100,1),
+           Off_tovr = round((TOV/(FGA+TOV-ORB))*100,1),
+           Off_FTAr = round((FTA/FGA)*100,1)) %>%
+    select(School, Off_PPG, Off_PPP, Off_Pace, Off_eFG, Off_tovr, Off_FTAr)
+  
+  data2 <- adv_school_data
+  colnames(data2) <- data2[1,]
+  data2 <- data2[!(data2$School == "School" | data2$School == ""), colSums(!is.na(data2)) > 0]
+  data2[, c(3, 15:29)] <- lapply(data2[, c(3, 15:29)], as.numeric)
+  data2 <- data2 %>%
+    mutate(Off_ORBr = `ORB%`,
+           Off_TRBr = `TRB%`) %>%
+    select(School, Off_ORBr, Off_TRBr)
+  
+  data3 <- reg_opp_data
+  colnames(data3) <- data3[1,]
+  data3 <- data3[!(data3$School == "School" | data3$School == ""), colSums(!is.na(data3)) > 0]
+  data3[, c(3, 15:33)] <- lapply(data3[, c(3, 15:33)], as.numeric)
+  data3 <- data3 %>%
+    mutate(Def_PPG = round(Opp./G,1),
+           Def_PPP = round((Opp./(FGA+TOV-ORB)),3),
+           Def_Pace = round((FGA+TOV-ORB)/G,1),
+           Def_eFG = round(((FG+(0.5*`3P`))/FGA)*100,1),
+           Def_tovr = round((TOV/(FGA+TOV-ORB))*100,1),
+           Def_FTAr = round((FTA/FGA)*100,1)) %>%
+    select(School, Def_PPG, Def_PPP, Def_Pace, Def_eFG, Def_tovr, Def_FTAr)
+  
+  data4 <- adv_opp_data
+  colnames(data4) <- data4[1,]
+  data4 <- data4[!(data4$School == "School" | data4$School == ""), colSums(!is.na(data4)) > 0]
+  data4[, c(3, 15:29)] <- lapply(data4[, c(3, 15:29)], as.numeric)
+  data4 <- data4 %>%
+    mutate(Def_ORBr = `ORB%`,
+           Def_TRBr = `TRB%`) %>%
+    select(School, Def_ORBr, Def_TRBr)
+  
+  data_lists <- list(data1, data2, data3, data4)
+  all_data <- reduce(data_lists, full_join, by = 'School')
+  
+  all_data$School <- gsub("\\s*NCAA\\s*$", "", all_data$School, perl = TRUE)
+  all_data$School <- gsub("[\u00A0\u2002\u2003]+$", "", all_data$School)
+  all_data$School <- trimws(all_data$School)
+  
+  off_value <- all_data %>%
+    filter(School == off_team) %>%
+    pull(paste0("Off_", select_stat))
+  
+  def_value <- all_data %>%
+    filter(School == def_team) %>%
+    pull(paste0("Def_", select_stat))
+  
+  plot_data <- tibble(
+    Team = c(off_team, def_team),
+    Value = c(off_value, def_value),
+    Type = c(paste0(off_team, ' - Offense'), paste0(def_team, ' - Defense')),
+    Color = c(off_team_color, def_team_color)
+  )
+  y_max <- max(plot_data$Value) * 1.1
+  plot_data <- plot_data %>%
+    mutate(x_pos = c("1_Offense", "2_Defense"))
+  
+  plot <- ggplot(plot_data, aes(x = x_pos, y = Value, fill = Color)) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = round(Value, 2)), vjust = -0.2, size = 2.5) +
+    scale_fill_identity() +
+    scale_x_discrete(labels = c(paste0("Offense"), paste0("Defense"))) +
+    labs(title = paste(stat),
+         y = stat,
+         x = "") +
+    theme_minimal() +
+    ylim(0, y_max) +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 10),
+          plot.subtitle = element_text(hjust = 0.5, size = 8),
+          axis.text.x = element_text(face = "bold", size = 7),
+          axis.text.y = element_text(size = 6),
+          axis.title.y = element_text(face = "bold", size = 8),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank())
+  return(plot)
+}
+#ColumnComparison(stat = 'Pace', off_team = 'North Carolina', def_team = 'Duke')
+```
+
+#W/L and L5
+```{r}
+WL_Comp <- function(select_school,year=2025) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == select_school | espn == select_school | ncaa == select_school)
+  team_logo <- team_stuff$logo_url
+  primary_color <- team_stuff$primary_color
+  
+  team <- select_school
+  team_fix <- gsub(" ", "-", tolower(team))
+  url <- paste0('https://www.sports-reference.com/cbb/schools/', team_fix, '/women/', year, '-gamelogs.html')
+  web <- read_html(url) %>% html_table()
+  data <- data.frame(web)
+  colnames(data)[1:10] <- ifelse(is.na(data[1, 1:10]) | data[1, 1:10] == "", "Location", data[1, 1:10])
+  for (i in 11:31) {
+    colnames(data)[i] <- paste0("Tm_", data[1, i])
+  }
+  for (i in 32:52) {
+    colnames(data)[i] <- paste0("Opp_", data[1, i])
+  }
+  data <- data[!(data$Opp == "Opp" | data$Opp == ''), ]
+  colnames(data)[9] = 'Opp_score'
+  colnames(data)[8] = 'Tm_score'
+  data[, 11:52] <- lapply(data[, 11:52], as.numeric)
+  data <- data %>%
+    mutate(Tm_Pace = Tm_FGA+Tm_TOV-Tm_ORB,
+           Opp_Pace = Opp_FGA+Opp_TOV-Opp_ORB,
+           Reb_Diff = Tm_TRB - Opp_TRB,
+           Tm_ORB_perc = round((Tm_ORB/(Tm_ORB+Opp_DRB))*100,1),
+           Opp_ORB_perc = round((Opp_ORB/(Opp_ORB+Tm_DRB))*100,1),
+           Tov_Diff = Opp_TOV-Tm_TOV,
+           Tm_FTA_rate = round((Tm_FTA/Tm_FGA)*100,1),
+           Opp_FTA_rate = round((Opp_FTA/Opp_FGA)*100,1),
+           Tm_3PAr = round((Tm_3PA/Tm_FGA)*100,1),
+           Opp_3PAr = round((Opp_3PA/Opp_FGA)*100,1),
+           Tm_TOV_perc = round((Tm_TOV/(Tm_FGA+Tm_TOV-Tm_ORB))*100,1),
+           Opp_TOV_perc = round((Opp_TOV/(Opp_FGA+Opp_TOV-Opp_ORB))*100,1))
+  cols_to_avg <- c("Tm_ORB", "Tm_TRB", "Tm_STL", "Tm_TOV", "Tm_PF", "Opp_ORB", "Opp_TRB", "Opp_STL", "Opp_TOV", "Opp_PF", "Tm_Pace", "Opp_Pace", "Reb_Diff", "Tm_ORB_perc", "Opp_ORB_perc", "Tov_Diff", "Tm_FTA_rate", "Opp_FTA_rate", "Tm_3PAr", "Opp_3PAr", "Tm_TOV_perc", "Opp_TOV_perc")
+  data$Date <- as.Date(data$Date, format = "%Y-%m-%d")
+  overall_avg <- data %>%
+    summarise(across(all_of(cols_to_avg), ~ mean(. , na.rm = TRUE))) %>%
+    mutate(Rslt = "Overall")
+  win_avg <- data %>%
+    filter(Rslt == "W") %>%
+    summarise(across(all_of(cols_to_avg), ~ mean(. , na.rm = TRUE))) %>%
+    mutate(Rslt = "Win")
+  loss_avg <- data %>%
+    filter(Rslt == "L") %>%
+    summarise(across(all_of(cols_to_avg), ~ mean(. , na.rm = TRUE))) %>%
+    mutate(Rslt = "Loss")
+  if (nrow(data) >= 6) {
+    last_5_avg <- data %>%
+      arrange(desc(Date)) %>%
+      slice_head(n = 5) %>%
+      summarise(across(all_of(cols_to_avg), ~ mean(. , na.rm = TRUE))) %>%
+      mutate(Rslt = "Last 5")
+  } else {
+    last_5_avg <- NULL
+  }
+  final_data <- bind_rows(overall_avg, win_avg, loss_avg, last_5_avg)
+  final_data <- final_data %>%
+    mutate(across(all_of(cols_to_avg), ~ round(. , 1))) %>%
+    select(Rslt, everything()) %>%
+    pivot_longer(cols = -Rslt, names_to = "Stats", values_to = "Values") %>%
+    pivot_wider(names_from = "Rslt", values_from = "Values") %>%
+    select(Stat=Stats, Overall, L5 = `Last 5`, Win, Loss)
+  stat_rename <- c(
+    "Tm_ORB" = "ORB PG", 
+    "Tm_TRB" = "TRB PG", 
+    "Tm_STL" = "STL PG", 
+    "Tm_TOV" = "TOV PG", 
+    "Tm_PF" = "Fouls PG", 
+    "Opp_ORB" = "ORB PG", 
+    "Opp_TRB" = "TRB PG", 
+    "Opp_STL" = "STL PG", 
+    "Opp_TOV" = "TOV PG", 
+    "Opp_PF" = "Fouls PG", 
+    "Tm_Pace" = "Pace", 
+    "Opp_Pace" = "Pace", 
+    "Reb_Diff" = "Rebound Differential", 
+    "Tm_ORB_perc" = "ORB%", 
+    "Opp_ORB_perc" = "ORB%", 
+    "Tov_Diff" = "Turnover Differential", 
+    "Tm_FTA_rate" = "FTAr", 
+    "Opp_FTA_rate" = "FTAr", 
+    "Tm_3PAr" = "3PAr", 
+    "Opp_3PAr" = "3PAr", 
+    "Tm_TOV_perc" = "Tov%", 
+    "Opp_TOV_perc" = "Tov%"
+  )
+  final_data <- final_data %>%
+    mutate(
+      Group = case_when(
+        grepl("^Tm_", Stat) ~ "Team",
+        grepl("^Opp_", Stat) ~ "Opponent",
+        TRUE ~ "Other"
+      ),
+      Stat = recode(Stat, !!!stat_rename)
+    )
+  final_data <- final_data %>%
+    mutate(`W/L Difference` = as.numeric(Win) - as.numeric(Loss))
+  min <- min(final_data$`W/L Difference`, na.rm = TRUE)
+  max <- max(final_data$`W/L Difference`, na.rm = TRUE)
+  
+  title_header <- glue(
+    "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{team_logo}' style='height: 45px; width: auto; border-radius: 5px;'>
+    </div>
+    <div style='text-align: center; flex-grow: 1;'>
+      <span style='font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; text-decoration: underline;'>W/L Comparison</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 12px; font-weight: bold;'>Averages throughout all games, last 5 games, wins, and losses</span>
+    </div>
+  </div>"
+  )
+  final_tbl <- final_data %>%
+    group_by(Group) %>%
+    gt() %>%
+    cols_label(Stat = md('**Stat**'), Overall = md('**Overall**'), L5 = md('**L5**'), Win = md('**Win**'), Loss = md('**Loss**'), `W/L Difference` = md('**W/L Difference**')) %>%
+    tab_style(style = cell_text(align = 'center'), locations = cells_body(columns = c(Overall, L5, Win, Loss))) %>%
+    tab_style(style = cell_text(align = 'center', decorate = 'underline'), locations = cells_column_labels()) %>%
+    tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = c(Stat))) %>%
+    tab_style(style = cell_text(align = 'left', decorate = 'underline'), locations = cells_column_labels(columns = Stat)) %>%
+    tab_style(style = cell_text(align = 'right', weight = 'bold'), locations = cells_body(columns = c(`W/L Difference`))) %>%
+    tab_style(style = cell_text(align = 'right', decorate = 'underline'), locations = cells_column_labels(columns = `W/L Difference`)) %>%
+    gt_add_divider(Stat) %>%
+    gt_add_divider(L5, weight = px(1)) %>%
+    gt_add_divider(`W/L Difference`, weight = px(1.5), sides = 'left') %>%
+    tab_style(locations = cells_row_groups(), style = list(cell_fill(color = 'gray89'),cell_text(align = 'center', size = 16, decorate = 'underline', weight = 'bold'))) %>%
+    data_color(columns = vars(`W/L Difference`), colors = scales::col_numeric(palette = c(primary_color, "transparent", primary_color), domain = c(min, 0, max))) %>%
+    tab_footnote(footnote = "Average amount they win/lose the Rebound battle by", locations = cells_body(rows = which(final_data$Stat == "Rebound Differential"), columns = 1)) %>%
+    tab_footnote(footnote = "Average amount they win/lose the Turnover battle by", locations = cells_body(rows = which(final_data$Stat == "Turnover Differential"), columns = 1)) %>%
+    tab_header(title = html(title_header)) %>%
+    cols_width(Stat ~ px(75), Overall ~ px(60), L5 ~ px(60), Win ~ px(60), Loss ~ px(60)) %>%
+    tab_spanner(columns = c(Overall, L5, Win, Loss), label = md('**Averages**')) %>%
+    tab_style(style = cell_text(align = 'center', decorate = 'underline'), locations = cells_column_spanners())
+  return(final_tbl)
+}
+#WL_Comp(select_school = 'Florida State')
+```
+
+#plot
+```{r}
+TeamPlots <- function(select_school1, select_school2, select_stat=c('ORtg', 'FTr', '3PAr', 'TS%', 'TRB%', 'AST%', 'STL%', 'BLK%', 'eFG%', 'TOV%', 'ORB%'), adv_school_data, adv_opp_data) {
+  data1 <-adv_school_data
+  data2 <- adv_opp_data
+  
+  colnames(data1) <- data1[1,]
+  data1 <- data1[!(data1$School == "School" | data1$School == ""), colSums(!is.na(data1)) > 0]
+  data1[, c(3, 15:29)] <- lapply(data1[, c(3, 15:29)], as.numeric)
+  
+  colnames(data2) <- data2[1,]
+  data2 <- data2[!(data2$School == "School" | data2$School == ""), colSums(!is.na(data2)) > 0]
+  data2[, c(3, 15:29)] <- lapply(data2[, c(3, 15:29)], as.numeric)
+  
+  common_columns <- 1:16
+  data1_common <- data1[, common_columns]
+  data2_common <- data2[, common_columns]
+  
+  data1_remaining <- data1[, -common_columns]
+  colnames(data1_remaining) <- paste("Off_", colnames(data1_remaining), sep = "")
+  
+  data2_remaining <- data2[, -common_columns]
+  colnames(data2_remaining) <- paste("Def_", colnames(data2_remaining), sep = "")
+  
+  final_data <- cbind(data1_common, data1_remaining, data2_remaining)
+  
+  final_data$School <- gsub("\\s*NCAA\\s*$", "", final_data$School, perl = TRUE)
+  final_data$School <- gsub("[\u00A0\u2002\u2003]+$", "", final_data$School)
+  final_data$School <- trimws(final_data$School)
+  
+  final_data <- final_data %>%
+    left_join(mbb_team_info %>%
+                select(School = team_name, conference) %>%
+                bind_rows(mbb_team_info %>%
+                            select(School = ncaa, conference)) %>%
+                bind_rows(mbb_team_info %>%
+                            select(School = espn, conference)),
+              by = "School") %>% distinct()
+  
+  final_data <- final_data %>%
+    filter(!is.na(conference))
+  
+  final_data$select_school_flag1 <- ifelse(final_data$School == select_school1, TRUE, FALSE)
+  final_data$select_school_flag2 <- ifelse(final_data$School == select_school2, TRUE, FALSE)
+
+  final_data <- final_data %>%
+    mutate(`Off_eFG%` = `Off_eFG%`*100,
+           `Off_FT/FGA` = `Off_FT/FGA`*100,
+           `Def_eFG%` = `Def_eFG%`*100,
+           `Def_FT/FGA` = `Def_FT/FGA`*100,
+           `Off_FTr` = `Off_FTr`*100,
+           `Def_FTr` = `Def_FTr`*100,
+           `Off_TS%` = `Off_TS%`*100,
+           `Def_TS%` = `Def_TS%`*100)
+  
+  offensive_column <- paste("Off_", select_stat, sep = "")
+  defensive_column <- paste("Def_", select_stat, sep = "")
+  
+  plot <- ggplot(final_data, aes(x = .data[[offensive_column]], y = .data[[defensive_column]])) +
+    geom_point(data = subset(final_data, !(select_school_flag1 | select_school_flag2)), aes(x = .data[[offensive_column]], y = .data[[defensive_column]]), 
+               shape = 21, color = 'black', fill = 'black', size = 1.5) +
+    geom_vline(aes(xintercept = mean(.data[[offensive_column]], na.rm = TRUE)), 
+               linetype = "dashed", color = "grey40", size = 1.2) +
+    geom_hline(aes(yintercept = mean(.data[[defensive_column]], na.rm = TRUE)), 
+               linetype = "dashed", color = "grey40", size = 1.2) +
+    geom_point(data = subset(final_data, select_school_flag1), aes(x = .data[[offensive_column]], y = .data[[defensive_column]]), 
+               shape = 18, color = 'red', size = 8) +
+    geom_point(data = subset(final_data, select_school_flag2), aes(x = .data[[offensive_column]], y = .data[[defensive_column]]), 
+               shape = 17, color = 'blue', size = 6) +
+    labs(x = "Offensive", 
+         y = "Defensive",
+         title = paste(select_stat, "Offensive vs Defensive"),
+         subtitle = paste0(select_school1, " is the red diamond, ", select_school2, " is the blue triangle.\nBlack circles represent all other teams.\nGrey dotted lines represent NCAA averages.")) +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
+          plot.subtitle = element_text(hjust = 0.5, size = 8),
+          axis.title.x = element_text(face = "bold", size = 10),
+          axis.title.y = element_text(face = "bold", size = 10),
+          legend.position = "none")
+  return(plot)
+}
+#TeamPlots(select_school1 = 'North Carolina', select_school2 = 'Duke', select_stat = 'TS%', adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+```
+
+#banner
+```{r}
+TeamBanner1 <- function(select_school) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == select_school | espn == select_school | ncaa == select_school)
+  team_logo <- team_stuff$logo_url
+  primary_color <- team_stuff$primary_color
+  conference <- team_stuff$conference
+  
+  conf_logos <- data.frame(`A-10` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Atlantic_10_Conference_logo.svg/2560px-Atlantic_10_Conference_logo.svg.png'),
+                           `A-Sun` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/ASUN_Primary_Mark.png/250px-ASUN_Primary_Mark.png'),
+                           AAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/American_Athletic_Conference_logo.svg/1200px-American_Athletic_Conference_logo.svg.png'),
+                           ACC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Atlantic_Coast_Conference_logo.svg/1200px-Atlantic_Coast_Conference_logo.svg.png'),
+                           `Am. East` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/America_East_Conference_logo_2024.svg/1200px-America_East_Conference_logo_2024.svg.png'),
+                           `Big 10` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Big_Ten_Conference_logo.svg/1200px-Big_Ten_Conference_logo.svg.png'),
+                           `Big 12` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Big_12_Conference_%28cropped%29_logo.svg/1200px-Big_12_Conference_%28cropped%29_logo.svg.png'),
+                           `Big East` = c('https://upload.wikimedia.org/wikipedia/commons/b/bb/Big_east_conf_logo.png'),
+                           `Big Sky` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Big_Sky_Conference_logo.svg/1200px-Big_Sky_Conference_logo.svg.png'),
+                           `Big South` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Big_South_Conference_logo_in_Presbyterian_colors.svg/1200px-Big_South_Conference_logo_in_Presbyterian_colors.svg.png'),
+                           `Big West` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Big_West_Conference_logo_2021.svg/220px-Big_West_Conference_logo_2021.svg.png'),
+                           `C-USA` = c('https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/CUSA_logo.svg/1280px-CUSA_logo.svg.png'),
+                           CAA = c('https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Coastal_Athletic_Association_logo.svg/1200px-Coastal_Athletic_Association_logo.svg.png'),
+                           Horizon = c('https://upload.wikimedia.org/wikipedia/commons/e/e5/Horizon_League_logo.svg'),
+                           Ivy = c('https://upload.wikimedia.org/wikipedia/commons/2/24/Ivy_league_simple_logo.png'),
+                           MAAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Metro_Atlantic_Athletic_Conference_logo.svg/1200px-Metro_Atlantic_Athletic_Conference_logo.svg.png'),
+                           MAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Mid-American_Conference_logo.svg/1200px-Mid-American_Conference_logo.svg.png'),
+                           MEAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Mid-Eastern_Athletic_Conference_logo.svg/1200px-Mid-Eastern_Athletic_Conference_logo.svg.png'),
+                           MVC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Missouri_Valley_Conference_logo.svg/800px-Missouri_Valley_Conference_logo.svg.png'),
+                           MWC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Mountain_West_Conference_logo.svg/1200px-Mountain_West_Conference_logo.svg.png'),
+                           NEC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Northeast_Conference_logo.svg/1200px-Northeast_Conference_logo.svg.png'),
+                           OVC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Ohio_Valley_Conference_logo.svg/1200px-Ohio_Valley_Conference_logo.svg.png'),
+                           `Pac 12` = c('https://upload.wikimedia.org/wikipedia/en/thumb/a/ac/Pac-12_logo.svg/1200px-Pac-12_logo.svg.png'),
+                           Patriot = c('https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Patriot_league_conference_logo.svg/800px-Patriot_league_conference_logo.svg.png'),
+                           SEC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Southeastern_Conference_logo_%282024%29.svg/1200px-Southeastern_Conference_logo_%282024%29.svg.png'),
+                           Southern = c('https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Southern_Conference_logo.svg/1200px-Southern_Conference_logo.svg.png'),
+                           Southland = c('https://upload.wikimedia.org/wikipedia/en/thumb/5/5d/Southland_Conference_logo.svg/2560px-Southland_Conference_logo.svg.png'),
+                           Summit = c('https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Summit_League_logo.svg/800px-Summit_League_logo.svg.png'),
+                           Sunbelt = c('https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Sun_Belt_Conference_2020_logo_and_name.svg/2560px-Sun_Belt_Conference_2020_logo_and_name.svg.png'),
+                           SWAC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Southwestern_Athletic_Conference_logo.svg/2560px-Southwestern_Athletic_Conference_logo.svg.png'),
+                           WAC = c('https://upload.wikimedia.org/wikipedia/commons/f/f5/Logo_WAC.png'),
+                           WCC = c('https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/West_Coast_Conference_logo_2019_with_name.svg/1200px-West_Coast_Conference_logo_2019_with_name.svg.png'))
+  conf_logos <- conf_logos %>%
+    rename(`A-10` = A.10,
+           `A-Sun` = A.Sun,
+           `Am. East` = Am..East,
+           `Big 10` = Big.10,
+           `Big 12` = Big.12,
+           `Big East` = Big.East,
+           `Big Sky` = Big.Sky,
+           `Big South` = Big.South,
+           `Big.West` = Big.West,
+           `C-USA` = C.USA,
+           `Pac 12` = Pac.12)
+  
+  conference_logo <- conf_logos[[conference]]
+  
+  date <- format(Sys.Date(), "%m/%d/%Y")
+  banner_data <- data.frame(one = team_logo, two = paste0(select_school, '<br>Team Overview - ', date), three = conference_logo)
+  tbl <- banner_data %>%
+    gt() %>%
+    cols_label(one = '', two = '', three = '') %>%
+    tab_options(column_labels.hidden = TRUE) %>%
+    text_transform(locations = cells_body(vars(one)), fn = function(x) {web_image(url = x, height = px(55))}) %>%
+    text_transform(locations = cells_body(vars(three)), fn = function(x) {web_image(url = x, height = px(35))}) %>%
+    tab_style(style = cell_text(align = 'center', weight = 'bold', size = px(18)), locations = cells_body(columns = c(two))) %>%
+    tab_style(style = cell_text(align = 'center'), locations = cells_body(columns = c(one,three))) %>%
+    tab_options(table.background.color = 'white') %>%
+    fmt_markdown(columns = vars(two)) %>%
+    cols_width(one ~ px(125), two ~ px(300), three ~ px(125))
+  return(tbl)
+}
+#TeamBanner(select_school = 'North Carolina')
+```
+
+#complete off bar chart comp
+```{r}
+OffDefBars <- function(off_team, def_team, reg_school_data, adv_school_data, reg_opp_data, adv_opp_data) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == off_team | espn == off_team | ncaa == off_team)
+  off_color <- team_stuff$primary_color
+  
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == def_team | espn == def_team | ncaa == def_team)
+  def_color <- team_stuff$primary_color
+  
+  data1 <- reg_school_data
+  colnames(data1) <- data1[1,]
+  data1 <- data1[!(data1$School == "School" | data1$School == ""), colSums(!is.na(data1)) > 0]
+  data1[, 15:33] <- lapply(data1[, 15:33], as.numeric)
+  data1 <- data1 %>% mutate(`3P%` = `3P%`*100) %>%
+    select(School, `3P%`)
+  
+  data2 <- adv_school_data
+  colnames(data2) <- data2[1,]
+  data2 <- data2[!(data2$School == "School" | data2$School == ""), colSums(!is.na(data2)) > 0]
+  data2[, c(3, 15:29)] <- lapply(data2[, c(3, 15:29)], as.numeric)
+  data2 <- data2 %>% mutate(`3PAr` = `3PAr`*100, FTr = FTr*100, `eFG%` = `eFG%`*100) %>%
+    select(School, ORtg, `3PAr`, FTr, `eFG%`, `TOV%`, `ORB%`, `TRB%`)
+  
+  data3 <- reg_opp_data
+  colnames(data3) <- data3[1,]
+  data3 <- data3[!(data3$School == "School" | data3$School == ""), colSums(!is.na(data3)) > 0]
+  data3[, 15:33] <- lapply(data3[, 15:33], as.numeric)
+  data3 <- data3 %>% mutate(`3P%` = `3P%`*100) %>%
+    select(School, `3P%`)
+  
+  data4 <- adv_opp_data
+  colnames(data4) <- data4[1,]
+  data4 <- data4[!(data4$School == "School" | data4$School == ""), colSums(!is.na(data4)) > 0]
+  data4[, c(3, 15:29)] <- lapply(data4[, c(3, 15:29)], as.numeric)
+  data4 <- data4 %>% mutate(`3PAr` = `3PAr`*100, FTr = FTr*100, `eFG%` = `eFG%`*100) %>%
+    select(School, ORtg, `3PAr`, FTr, `eFG%`, `TOV%`, `ORB%`, `TRB%`)
+  
+  off_data <- inner_join(data2, data1, by = 'School')
+  off_data$School <- gsub("\\s*NCAA\\s*$", "", off_data$School, perl = TRUE)
+  off_data$School <- gsub("[\u00A0\u2002\u2003]+$", "", off_data$School)
+  off_data$School <- trimws(off_data$School)
+  off_data <- off_data %>%
+    select(School, ORTG=ORtg, `eFG%`, `3pt%`=`3P%`, `3PAr`, FTr, `TOV%`, `ORB%`, `TRB%`) %>%
+    mutate(across(c('ORTG', 'eFG%', '3pt%', '3PAr', 'FTr', 'TOV%', 'ORB%', 'TRB%'), percent_rank, .names = '{col}_ptile'))
+  off_data <- off_data %>% mutate(`TOV%_ptile`=1-`TOV%_ptile`)
+  off_data <- off_data %>% filter(School == off_team)
+  
+  def_data <- inner_join(data4, data3, by = 'School')
+  def_data$School <- gsub("\\s*NCAA\\s*$", "", def_data$School, perl = TRUE)
+  def_data$School <- gsub("[\u00A0\u2002\u2003]+$", "", def_data$School)
+  def_data$School <- trimws(def_data$School)
+  def_data <- def_data %>%
+    select(School, ORTG=ORtg, `eFG%`, `3pt%`=`3P%`, `3PAr`, FTr, `TOV%`, `ORB%`, `TRB%`) %>%
+    mutate(across(c('ORTG', 'eFG%', '3pt%', '3PAr', 'FTr', 'TOV%', 'ORB%', 'TRB%'), percent_rank, .names = '{col}_ptile'))
+  def_data <- def_data %>% mutate(`ORTG_ptile`=1-`ORTG_ptile`,
+                                  `eFG%_ptile`=1-`eFG%_ptile`,
+                                  `3pt%_ptile`=1-`3pt%_ptile`,
+                                  `3PAr_ptile`=1-`3PAr_ptile`,
+                                  `FTr_ptile`=1-`FTr_ptile`,
+                                  `ORB%_ptile`=1-`ORB%_ptile`,
+                                  `TRB%_ptile`=1-`TRB%_ptile`)
+  def_data <- def_data %>% filter(School == def_team)
+  
+  final_data <- rbind(off_data, def_data)
+  ptile_columns <- grep("_ptile$", names(final_data), value = TRUE)
+  final_data[ptile_columns] <- round(final_data[ptile_columns] * 100, 1)
+  
+  stat_order <- c('ORTG', 'eFG%', '3pt%', '3PAr', 'FTr', 'TOV%', 'ORB%', 'TRB%')
+  
+  stats_long <- final_data %>%
+    gather(key = "stat", value = "value", -School) %>%
+    filter(!grepl("_ptile", stat))
+  
+  ptiles_long <- final_data %>%
+    gather(key = "stat", value = "ptile_value", -School) %>%
+    filter(grepl("_ptile", stat)) %>%
+    mutate(stat = sub("_ptile", "", stat))
+  
+  final_data_long <- merge(stats_long, ptiles_long, by = c("School", "stat"))
+  final_data_long$stat <- factor(final_data_long$stat, levels = stat_order)
+  final_data_long$School <- factor(final_data_long$School, levels = c(off_team, def_team))
+  final_data_long <- final_data_long %>%
+    arrange(School, stat)
+  
+  plot <- ggplot(final_data_long, aes(x = ptile_value, y = stat, fill = ifelse(School == def_team, def_color, off_color))) +
+    geom_bar(stat = "identity", position = 'dodge') +
+    geom_text(aes(label = round(value, 1), x = ptile_value + 2.3), position = position_dodge(width = 0.9), hjust = 0.5, size = 3) +
+    scale_fill_identity() +
+    theme_minimal() +
+    ggtitle(paste0(off_team, " Offense vs. ", def_team, " Defense"), 
+            subtitle = "Bars represent %tile values compared to league.\nNumbers above the bar represent true value.") +
+    theme(axis.title.x = element_blank(), 
+          axis.title.y = element_text(size=12, face='bold'), 
+          axis.text.y = element_text(size = 10, face = "bold"),
+          plot.margin = margin(1, 1, 1, 1),
+          axis.text.x = element_text(size = 8, face='bold'),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+          plot.subtitle = element_text(size = 10, face = "italic", hjust = 0.5)) +
+    xlab("%tile") +
+    xlim(0, 100) +
+    coord_flip()
+  return(plot)
+}
+#OffDefBars(off_team = 'Duke', def_team = 'North Carolina', reg_school_data = data_reg_school, adv_school_data = data_adv_school, reg_opp_data = data_reg_opp, adv_opp_data = data_adv_opp)
+#OffDefBars(off_team = 'North Carolina', def_team = 'Duke', reg_school_data = data_reg_school, adv_school_data = data_adv_school, reg_opp_data = data_reg_opp, adv_opp_data = data_adv_opp)
+```
+
+#player comparisons
+```{r}
+TeamRoster <- function(select_school,year=2025) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == select_school | espn == select_school | ncaa == select_school)
+  team_logo <- team_stuff$logo_url
+  
+  team_fix <- gsub(" ", "-", tolower(school))
+  url <- paste0('https://www.sports-reference.com/cbb/schools/', team_fix, '/women/', year, '.html')
+  web <- read_html(url) %>% html_table()
+  data <- data.frame(web[1])
+  data2 <- data.frame(web[6])
+  all_data <- data %>%
+    select(Player, X., Class, Pos, Height, Summary) %>%
+    left_join(data2 %>% select(Player, MP), by = "Player")
+  all_data <- all_data %>%
+    rename('Num' = X.,
+           'Yr' = Class,
+           'Ht' = Height,
+           'Stats' = Summary,
+           'Mins' = MP) %>%
+    select(Player, Num, Yr, Ht, Mins, Stats) %>%
+    arrange(desc(Mins)) %>%
+    slice_head(n=10)
+  
+  title_header <- glue(
+    "<div style='display: flex; align-items: center; justify-content: space-between;'>
+    <div style='text-align: left;'>
+      <img src='{team_logo}' style='height: 45px; width: auto; border-radius: 5px;'>
+    </div>
+    <div style='text-align: center; flex-grow: 1;'>
+      <span style='font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; text-decoration: underline;'>{select_school} Roster Overview</span><br>
+      <span style='font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;'>Top 10 Players in Minutes Played Per Game</span>
+    </div>
+  </div>"
+  )
+  table <- all_data %>%
+    gt() %>%
+    tab_style(style = cell_text(align = 'center', weight = 'bold', decorate = 'underline'), locations = cells_column_labels()) %>%
+    tab_style(style = cell_text(align = 'left', weight = 'bold'), locations = cells_body(columns = c(Player))) %>%
+    tab_style(style = cell_text(align = 'center'), locations = cells_body(columns = c(Num, Yr, Ht, Mins, Stats))) %>%
+    gt_add_divider(Player, weight = px(1.5)) %>%
+    gt_add_divider(Mins, weight = px(1)) %>%
+    tab_style(style = cell_text(align = 'left', weight = 'bold', decorate = 'underline'), locations = cells_column_labels(columns = c(Player))) %>%
+    cols_width(Num ~ px(50), Yr ~ px(50), Ht ~ px(50), Mins ~ px(50)) %>%
+    tab_header(title = html(title_header))
+  return(table)
+}
+#TeamRoster(select_school = 'North Carolina')
+```
+
+#banner 2
+```{r}
+TeamBanner2 <- function(school1, school2) {
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == school1 | espn == school1 | ncaa == school1)
+  team_logo1 <- team_stuff$logo_url
+  
+  team_stuff <- mbb_team_info %>%
+    filter(team_name == school2 | espn == school2 | ncaa == school2)
+  team_logo2 <- team_stuff$logo_url
+  
+  date <- format(Sys.Date(), "%m/%d/%Y")
+  banner_data <- data.frame(one = team_logo1, two = paste0(school1, ' vs. ', school2, '<br>Team Comparisons - ', date), three = team_logo2)
+  tbl <- banner_data %>%
+    gt() %>%
+    cols_label(one = '', two = '', three = '') %>%
+    tab_options(column_labels.hidden = TRUE) %>%
+    text_transform(locations = cells_body(vars(one)), fn = function(x) {web_image(url = x, height = px(55))}) %>%
+    text_transform(locations = cells_body(vars(three)), fn = function(x) {web_image(url = x, height = px(55))}) %>%
+    tab_style(style = cell_text(align = 'center', weight = 'bold', size = px(20)), locations = cells_body(columns = c(two))) %>%
+    tab_style(style = cell_text(align = 'center'), locations = cells_body(columns = c(one,three))) %>%
+    tab_options(table.background.color = 'white') %>%
+    fmt_markdown(columns = vars(two)) %>%
+    cols_width(one ~ px(200), two ~ px(400), three ~ px(200))
+  return(tbl)
+}
+#TeamBanner(school1 = 'North Carolina', school2 = 'Duke')
+```
+

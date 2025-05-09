@@ -1,0 +1,943 @@
+---
+title: "PlayCalls"
+author: "Greg"
+date: "2025-01-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB/Projects/Play Calls")
+```
+
+#packages
+```{r}
+library(readxl)
+library(tidyr)
+library(dplyr)
+library(gt)
+library(gtExtras)
+library(ggplot2)
+library(glue)
+library(stringr)
+```
+
+#data
+```{r}
+path <- '/Users/gregorylederer/Desktop/UNC WBB/Projects/Play Calls/PlayCalls_data.xlsx'
+
+GT1 <- read_excel(path, sheet = 1)
+Miami1 <- read_excel(path, sheet = 2)
+ND1 <- read_excel(path, sheet = 3)
+Duke1 <- read_excel(path, sheet = 4)
+BC1 <- read_excel(path, sheet = 5)
+Pitt1 <- read_excel(path, sheet = 6)
+FSU1 <- read_excel(path, sheet = 7)
+Cal1 <- read_excel(path, sheet = 8)
+Stanford1 <- read_excel(path, sheet = 9)
+Clemson1 <- read_excel(path, sheet = 10)
+VATech1 <- read_excel(path, sheet = 11)
+NCState1 <- read_excel(path, sheet = 12)
+Syracuse1 <- read_excel(path, sheet = 13)
+LVille1 <- read_excel(path, sheet = 14)
+Duke2 <- read_excel(path, sheet = 15)
+UVA1 <- read_excel(path, sheet = 16)
+
+all_data <- rbind(GT1, Miami1, ND1, Duke1, BC1, Pitt1, FSU1, Cal1, Stanford1, Clemson1, VATech1, NCState1, Syracuse1, LVille1, Duke2, UVA1)
+all_data <- all_data %>% mutate(`PLAY CALLS` = ifelse(`PLAY CALLS` == "Iverson P2P", "IVERSON P2P", `PLAY CALLS`))
+```
+
+#unique stuff
+```{r}
+unique(all_data$`PLAY CALLS`)
+unique(all_data$`SHOT RATING`)
+unique(all_data$`POSS RESULTS`)
+```
+main categories:
+- BLOB
+  - Bulls
+  - Hawk 1,2,5
+  - Pacers (),4,5
+- Horns
+  - (), 2, 3, 4, 5, 55
+  - Celtics
+  - Circle
+  - Pinch
+  - Shoulder Tap
+
+#poss results data
+```{r}
+poss_metrics <- all_data[all_data$`POSS RESULTS` != 'OPEN', ]
+poss_metrics <- poss_metrics %>%
+  group_by(`PLAY CALLS`) %>%
+  summarise(
+    total_calls = n(),
+    
+    # Points per Possession (PPP)
+    total_points = sum(as.numeric(`POSS RESULTS`[`POSS RESULTS` %in% c("2", "3")]), na.rm = TRUE),
+    total_possessions = sum(!`POSS RESULTS` %in% c("FD"), na.rm = TRUE),
+    PPP = round(total_points / total_possessions,3),
+    
+    # Turnover Frequency (TO%)
+    TO_freq = round(mean(`POSS RESULTS` == "TO", na.rm = TRUE),3),
+    
+    # Foul Rate (FD%)
+    FD_rate = round(mean(`POSS RESULTS` == "FD", na.rm = TRUE),3),
+    
+    # Shooting Efficiency Metrics
+    total_2_makes = sum(`POSS RESULTS` == "2", na.rm = TRUE),
+    total_2_attempts = sum(`POSS RESULTS` %in% c("2", "-2"), na.rm = TRUE),
+    two_pt_percent = round(total_2_makes / total_2_attempts,3),
+    
+    total_3_makes = sum(`POSS RESULTS` == "3", na.rm = TRUE),
+    total_3_attempts = sum(`POSS RESULTS` %in% c("3", "-3"), na.rm = TRUE),
+    three_pt_percent = round(total_3_makes / total_3_attempts,3),
+    
+    FG_makes = total_2_makes + total_3_makes,
+    FG_attempts = sum(`POSS RESULTS` %in% c("2", "-2", "3", "-3"), na.rm = TRUE),
+    FG_percent = round(FG_makes / FG_attempts,3),
+    
+    eFG = round(((total_2_makes + (1.5 * total_3_makes)) / FG_attempts),3),
+    
+    two_text = paste0(total_2_makes, '/', total_2_attempts),
+    three_text = paste0(total_3_makes, '/', total_3_attempts),
+    fg_text = paste0(FG_makes, '/', FG_attempts)
+  )
+
+poss_metrics <- poss_metrics %>% select(`PLAY CALLS`, total_calls, PPP, eFG, fg_text, FG_percent, two_text, two_pt_percent, three_text, three_pt_percent)
+poss_metrics[is.na(poss_metrics)] = 0
+
+poss_metrics <- poss_metrics %>%
+  mutate(
+    PPP = round(PPP,2),
+    FG_percent = round(FG_percent*100,1),
+    eFG = round(eFG*100,1),
+    two_pt_percent = round(two_pt_percent*100,1),
+    three_pt_percent = round(three_pt_percent*100,1)
+  )
+```
+
+#shot rating
+```{r}
+rating_metrics <- all_data[!all_data$`SHOT RATING` %in% c(2, 3, -2, -3), ]
+
+rating_metrics <- all_data %>%
+  group_by(`PLAY CALLS`) %>%
+  summarise(
+    total_calls = n(),
+    
+    # Proportion of possessions resulting in a foul drawn (FD)
+    FD_rate = mean(`SHOT RATING` == "FD", na.rm = TRUE),
+    
+    # Filter out rows with FD for other proportions
+    total_non_FD = sum(`SHOT RATING` != "FD", na.rm = TRUE),
+    Advantage_rate = sum(`SHOT RATING` == "1V1 ADVANTAGE", na.rm = TRUE) / total_non_FD,
+    Contested_rate = sum(`SHOT RATING` == "CONTESTED", na.rm = TRUE) / total_non_FD,
+    Open_rate = sum(`SHOT RATING` == "OPEN", na.rm = TRUE) / total_non_FD,
+    TO_rate = sum(`SHOT RATING` == "TO", na.rm = TRUE) / total_non_FD
+  )
+rating_metrics <- rating_metrics %>% select(`PLAY CALLS`, total_calls, FD_rate, Advantage_rate, Contested_rate, Open_rate, TO_rate)
+rating_metrics[is.na(rating_metrics)] = 0
+
+rating_metrics <- rating_metrics %>%
+  mutate(
+    FD_rate = round(FD_rate*100,1),
+    Advantage_rate = round(Advantage_rate*100,1),
+    Contested_rate = round(Contested_rate*100,1),
+    Open_rate = round(Open_rate*100,1),
+    TO_rate = round(TO_rate*100,1)
+  )
+```
+
+#write csv
+```{r}
+# poss_metrics <- poss_metrics %>%
+#   rename(
+#     'Play Calls' = `PLAY CALLS`,
+#     '# of Possessions' = total_calls,
+#     'FG' = fg_text,
+#     'FG%' = FG_percent,
+#     'eFG%' = eFG,
+#     '2pt' = two_text,
+#     '2pt%' = two_pt_percent,
+#     '3pt' = three_text,
+#     '3pt%' = three_pt_percent
+#   )
+# 
+# rating_metrics <- rating_metrics %>%
+#   rename(
+#     'Play Calls' = `PLAY CALLS`,
+#     '# of Possessions' = total_calls,
+#     'Foul Drawn Rate' = FD_rate,
+#     '1v1 Advantage Rate' = Advantage_rate,
+#     'Contested Rate' = Contested_rate,
+#     'Open Rate' = Open_rate,
+#     'Tov Rate' = TO_rate
+#   )
+
+# write.csv(poss_metrics, 'Possession Outcome Stats.csv')
+# write.csv(rating_metrics, 'Possession Rating Stats.csv')
+```
+
+combine:
+- BLOB
+- BATTLE
+- BLUE
+- CHIN
+- HORNS
+- SLOB
+- TRANS or TRANSITION
+- ZIPPER
+- ZONE
+
+- Iverson
+- Fist
+- Floppy
+
+```{r}
+all_data_grouped <- all_data %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      grepl("BLOB", `PLAY CALLS`, ignore.case = TRUE) ~ "BLOB",
+      grepl("BATTLE", `PLAY CALLS`, ignore.case = TRUE) ~ "BATTLE",
+      grepl("BLUE", `PLAY CALLS`, ignore.case = TRUE) ~ "BLUE",
+      grepl("CHIN", `PLAY CALLS`, ignore.case = TRUE) ~ "CHIN",
+      grepl("HORNS", `PLAY CALLS`, ignore.case = TRUE) ~ "HORNS",
+      grepl("SLOB", `PLAY CALLS`, ignore.case = TRUE) ~ "SLOB",
+      grepl("TRANS|TRANSITION", `PLAY CALLS`, ignore.case = TRUE) ~ "TRANSITION",
+      grepl("ZIPPER", `PLAY CALLS`, ignore.case = TRUE) ~ "ZIPPER",
+      grepl("ZONE", `PLAY CALLS`, ignore.case = TRUE) ~ "ZONE",
+      grepl("IVERSON", `PLAY CALLS`, ignore.case = TRUE) ~ "IVERSON",
+      grepl("FIST", `PLAY CALLS`, ignore.case = TRUE) ~ "FIST",
+      grepl("FLOPPY", `PLAY CALLS`, ignore.case = TRUE) ~ "FLOPPY",
+      grepl("DRAG", `PLAY CALLS`, ignore.case = TRUE) ~ "DRAG",
+      TRUE ~ `PLAY CALLS` # Keep original play call if no match
+    )
+  )
+
+poss_metrics_grouped <- all_data_grouped[all_data_grouped$`POSS RESULTS` != 'OPEN', ]
+poss_metrics_grouped <- poss_metrics_grouped %>%
+  group_by(`PLAY CALLS`) %>%
+  summarise(
+    total_calls = n(),
+    
+    # Points per Possession (PPP)
+    total_points = sum(as.numeric(`POSS RESULTS`[`POSS RESULTS` %in% c("2", "3")]), na.rm = TRUE),
+    total_possessions = sum(!`POSS RESULTS` %in% c("FD"), na.rm = TRUE),
+    PPP = round(total_points / total_possessions,3),
+    
+    # Turnover Frequency (TO%)
+    TO_freq = round(mean(`POSS RESULTS` == "TO", na.rm = TRUE),3),
+    
+    # Foul Rate (FD%)
+    FD_rate = round(mean(`POSS RESULTS` == "FD", na.rm = TRUE),3),
+    
+    # Shooting Efficiency Metrics
+    total_2_makes = sum(`POSS RESULTS` == "2", na.rm = TRUE),
+    total_2_attempts = sum(`POSS RESULTS` %in% c("2", "-2"), na.rm = TRUE),
+    two_pt_percent = round(total_2_makes / total_2_attempts,3),
+    
+    total_3_makes = sum(`POSS RESULTS` == "3", na.rm = TRUE),
+    total_3_attempts = sum(`POSS RESULTS` %in% c("3", "-3"), na.rm = TRUE),
+    three_pt_percent = round(total_3_makes / total_3_attempts,3),
+    
+    FG_makes = total_2_makes + total_3_makes,
+    FG_attempts = sum(`POSS RESULTS` %in% c("2", "-2", "3", "-3"), na.rm = TRUE),
+    FG_percent = round(FG_makes / FG_attempts,3),
+    
+    eFG = round(((total_2_makes + (1.5 * total_3_makes)) / FG_attempts),3),
+    
+    two_text = paste0(total_2_makes, '/', total_2_attempts),
+    three_text = paste0(total_3_makes, '/', total_3_attempts),
+    fg_text = paste0(FG_makes, '/', FG_attempts)
+  )
+
+poss_metrics_grouped <- poss_metrics_grouped %>% select(`PLAY CALLS`, total_calls, PPP, eFG, fg_text, FG_percent, two_text, two_pt_percent, three_text, three_pt_percent)
+poss_metrics_grouped[is.na(poss_metrics_grouped)] = 0
+
+poss_metrics_grouped <- poss_metrics_grouped %>%
+  mutate(
+    PPP = round(PPP,2),
+    FG_percent = round(FG_percent*100,1),
+    eFG = round(eFG*100,1),
+    two_pt_percent = round(two_pt_percent*100,1),
+    three_pt_percent = round(three_pt_percent*100,1)
+  )
+
+#--
+
+rating_metrics_grouped <- all_data_grouped[!all_data_grouped$`SHOT RATING` %in% c(2, 3, -2, -3), ]
+
+rating_metrics_grouped <- all_data_grouped %>%
+  group_by(`PLAY CALLS`) %>%
+  summarise(
+    total_calls = n(),
+    
+    # Proportion of possessions resulting in a foul drawn (FD)
+    FD_rate = mean(`SHOT RATING` == "FD", na.rm = TRUE),
+    
+    # Filter out rows with FD for other proportions
+    total_non_FD = sum(`SHOT RATING` != "FD", na.rm = TRUE),
+    Advantage_rate = sum(`SHOT RATING` == "1V1 ADVANTAGE", na.rm = TRUE) / total_non_FD,
+    Contested_rate = sum(`SHOT RATING` == "CONTESTED", na.rm = TRUE) / total_non_FD,
+    Open_rate = sum(`SHOT RATING` == "OPEN", na.rm = TRUE) / total_non_FD,
+    TO_rate = sum(`SHOT RATING` == "TO", na.rm = TRUE) / total_non_FD
+  )
+rating_metrics_grouped <- rating_metrics_grouped %>% select(`PLAY CALLS`, total_calls, FD_rate, Advantage_rate, Contested_rate, Open_rate, TO_rate)
+rating_metrics_grouped[is.na(rating_metrics_grouped)] = 0
+
+rating_metrics_grouped <- rating_metrics_grouped %>%
+  mutate(
+    FD_rate = round(FD_rate*100,1),
+    Advantage_rate = round(Advantage_rate*100,1),
+    Contested_rate = round(Contested_rate*100,1),
+    Open_rate = round(Open_rate*100,1),
+    TO_rate = round(TO_rate*100,1)
+  )
+```
+
+```{r}
+# write.csv(poss_metrics_grouped, 'Possession Outcome Stats - Grouped.csv')
+# write.csv(rating_metrics_grouped, 'Possession Rating Stats - Grouped.csv')
+```
+
+#horns
+```{r}
+set <- 'Horns'
+
+horns_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'HORNS')
+horns_overall_row_poss$`PLAY CALLS` <- 'Overall'
+horns_rows_poss <- poss_metrics %>%
+  filter(grepl("HORNS", `PLAY CALLS`, ignore.case = TRUE))
+horns_rows_poss <- horns_rows_poss %>% arrange(desc(total_calls))
+horns_rows_poss <- rbind(horns_rows_poss, horns_overall_row_poss)
+
+horns_rows_poss <- horns_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "HORNS" ~ "Unlabeled", 
+      grepl("HORNS", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("HORNS", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+title_header <- glue("
+  <div style='display: flex; align-items: center; justify-content: space-between;'>
+    <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/1200px-North_Carolina_Tar_Heels_logo.svg.png' style='height: 50px;'>
+    <div style='text-align: center;'>
+      <div style='font-size: 20px; font-weight: bold;'>{set} Set Metrics</div>
+      <div style='font-size: 14px; font-weight: normal;'>Possession Outcome Stats</div>
+    </div>
+    <img src='https://upload.wikimedia.org/wikipedia/en/thumb/3/37/Jumpman_logo.svg/400px-Jumpman_logo.svg.png' style='height: 50px;'>
+  </div>
+  ")
+
+horns_tbl_poss <- horns_rows_poss %>%
+  gt() %>%
+  cols_label(`PLAY CALLS` = md('**Play Call**'), total_calls = md('**Poss.**'), PPP = md('**PPP**'), eFG = md('**eFG%**'), fg_text = md('**FG**'), FG_percent = md('**FG%**'), two_text = md('**2pt**'), two_pt_percent = md('**2pt%**'), three_text = md('**3pt**'), three_pt_percent = md('**3pt%**')) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(vars(`PLAY CALLS`)), style = cell_text(align = 'left')) %>%
+  tab_style(locations = cells_body(vars(total_calls, PPP, eFG, fg_text, two_text, three_text, FG_percent, two_pt_percent, three_pt_percent)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(`PLAY CALLS`, weight = px(1.5)) %>%
+  gt_add_divider(eFG, weight = px(1)) %>%
+  gt_add_divider(FG_percent, weight = px(1)) %>%
+  gt_add_divider(two_pt_percent, weight = px(1)) %>%
+  data_color(columns = vars(PPP), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_poss$PPP), max(horns_rows_poss$PPP)))) %>%
+  data_color(columns = vars(eFG), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_poss$eFG), max(horns_rows_poss$eFG)))) %>%
+  data_color(columns = vars(FG_percent), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_poss$FG_percent), max(horns_rows_poss$FG_percent)))) %>%
+  data_color(columns = vars(two_pt_percent), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_poss$two_pt_percent), max(horns_rows_poss$two_pt_percent)))) %>%
+  data_color(columns = vars(three_pt_percent), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_poss$three_pt_percent), max(horns_rows_poss$three_pt_percent)))) %>%
+  tab_header(title = html(title_header))
+horns_tbl_poss
+
+#--
+
+horns_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'HORNS')
+horns_overall_row_rating$`PLAY CALLS` <- 'Overall'
+horns_rows_rating <- rating_metrics %>%
+  filter(grepl("HORNS", `PLAY CALLS`, ignore.case = TRUE))
+horns_rows_rating <- horns_rows_rating %>% arrange(desc(total_calls))
+horns_rows_rating <- rbind(horns_rows_rating, horns_overall_row_rating)
+
+horns_rows_rating <- horns_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "HORNS" ~ "Unlabeled", 
+      grepl("HORNS", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("HORNS", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+title_header <- glue("
+  <div style='display: flex; align-items: center; justify-content: space-between;'>
+    <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/1200px-North_Carolina_Tar_Heels_logo.svg.png' style='height: 50px;'>
+    <div style='text-align: center;'>
+      <div style='font-size: 20px; font-weight: bold;'>{set} Set Metrics</div>
+      <div style='font-size: 14px; font-weight: normal;'>Possession Rating Stats</div>
+    </div>
+    <img src='https://upload.wikimedia.org/wikipedia/en/thumb/3/37/Jumpman_logo.svg/400px-Jumpman_logo.svg.png' style='height: 50px;'>
+  </div>
+  ")
+horns_tbl_rating <- horns_rows_rating %>%
+  gt() %>%
+  cols_label(`PLAY CALLS` = md('**Play Call**'), total_calls = md('**Poss.**'), FD_rate = md('**Foul**'), Advantage_rate = md('**1v1 Advantage**'), Contested_rate = md('**Contested**'), Open_rate = md('**Open**'), TO_rate = md('**Tov**')) %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(vars(`PLAY CALLS`)), style = cell_text(align = 'left')) %>%
+  tab_style(locations = cells_body(vars(total_calls, FD_rate, Advantage_rate, Contested_rate, Open_rate, TO_rate)), style = cell_text(align = 'center')) %>%
+  gt_add_divider(`PLAY CALLS`, weight = px(1.5)) %>%
+  tab_spanner(label = md('**Rates**'), columns = vars(FD_rate, Advantage_rate, Contested_rate, Open_rate, TO_rate)) %>%
+  tab_style(locations = cells_column_spanners(), style = cell_text(align = 'center', decorate = 'underline')) %>%
+  tab_header(title = html(title_header)) %>%
+  data_color(columns = vars(FD_rate), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_rating$FD_rate), max(horns_rows_rating$FD_rate)))) %>%
+  data_color(columns = vars(Advantage_rate), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_rating$Advantage_rate), max(horns_rows_rating$Advantage_rate)))) %>%
+  data_color(columns = vars(Contested_rate), colors = scales::col_numeric(palette = c('#7bafd4', 'transparent'), domain = c(min(horns_rows_rating$Contested_rate), max(horns_rows_rating$Contested_rate)))) %>%
+  data_color(columns = vars(Open_rate), colors = scales::col_numeric(palette = c("transparent", '#7bafd4'), domain = c(min(horns_rows_rating$Open_rate), max(horns_rows_rating$Open_rate)))) %>%
+  data_color(columns = vars(TO_rate), colors = scales::col_numeric(palette = c('#7bafd4', 'transparent'), domain = c(min(horns_rows_rating$TO_rate), max(horns_rows_rating$TO_rate))))
+horns_tbl_rating
+```
+
+horns, BLOB
+```{r}
+horns_poss_metrics <- horns_rows_poss
+horns_rating_metrics <- horns_rows_rating
+
+#--
+
+blob_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'BLOB')
+blob_overall_row_poss$`PLAY CALLS` <- 'Overall'
+blob_rows_poss <- poss_metrics %>%
+  filter(grepl("BLOB", `PLAY CALLS`, ignore.case = TRUE))
+blob_rows_poss <- blob_rows_poss %>% arrange(desc(total_calls))
+blob_rows_poss <- rbind(blob_rows_poss, blob_overall_row_poss)
+blob_rows_poss <- blob_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "BLOB" ~ "Unlabeled", 
+      grepl("BLOB", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("BLOB", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+blob_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'BLOB')
+blob_overall_row_rating$`PLAY CALLS` <- 'Overall'
+blob_rows_rating <- rating_metrics %>%
+  filter(grepl("BLOB", `PLAY CALLS`, ignore.case = TRUE))
+blob_rows_rating <- blob_rows_rating %>% arrange(desc(total_calls))
+blob_rows_rating <- rbind(blob_rows_rating, blob_overall_row_rating)
+blob_rows_rating <- blob_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "BLOB" ~ "Unlabeled", 
+      grepl("BLOB", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("BLOB", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+blob_poss_metrics <- blob_rows_poss
+blob_rating_metrics <- blob_rows_rating
+
+#--
+
+blue_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'BLUE')
+blue_overall_row_poss$`PLAY CALLS` <- 'Overall'
+blue_rows_poss <- poss_metrics %>%
+  filter(grepl("BLUE", `PLAY CALLS`, ignore.case = TRUE))
+blue_rows_poss <- blue_rows_poss %>% arrange(desc(total_calls))
+blue_rows_poss <- rbind(blue_rows_poss, blue_overall_row_poss)
+blue_rows_poss <- blue_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "BLUE" ~ "Unlabeled", 
+      grepl("BLUE", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("BLUE", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+blue_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'BLUE')
+blue_overall_row_rating$`PLAY CALLS` <- 'Overall'
+blue_rows_rating <- rating_metrics %>%
+  filter(grepl("BLUE", `PLAY CALLS`, ignore.case = TRUE))
+blue_rows_rating <- blue_rows_rating %>% arrange(desc(total_calls))
+blue_rows_rating <- rbind(blue_rows_rating, blue_overall_row_rating)
+blue_rows_rating <- blue_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "BLUE" ~ "Unlabeled", 
+      grepl("BLUE", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("BLUE", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+blue_poss_metrics <- blue_rows_poss
+blue_rating_metrics <- blue_rows_rating
+
+#--
+
+chin_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'CHIN')
+chin_overall_row_poss$`PLAY CALLS` <- 'Overall'
+chin_rows_poss <- poss_metrics %>%
+  filter(grepl("CHIN", `PLAY CALLS`, ignore.case = TRUE))
+chin_rows_poss <- chin_rows_poss %>% arrange(desc(total_calls))
+chin_rows_poss <- rbind(chin_rows_poss, chin_overall_row_poss)
+chin_rows_poss <- chin_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "CHIN" ~ "Unlabeled", 
+      grepl("CHIN", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("CHIN", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+chin_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'CHIN')
+chin_overall_row_rating$`PLAY CALLS` <- 'Overall'
+chin_rows_rating <- rating_metrics %>%
+  filter(grepl("CHIN", `PLAY CALLS`, ignore.case = TRUE))
+chin_rows_rating <- chin_rows_rating %>% arrange(desc(total_calls))
+chin_rows_rating <- rbind(chin_rows_rating, chin_overall_row_rating)
+chin_rows_rating <- chin_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "CHIN" ~ "Unlabeled", 
+      grepl("CHIN", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("CHIN", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+chin_poss_metrics <- chin_rows_poss
+chin_rating_metrics <- chin_rows_rating
+
+#--
+
+slob_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'SLOB')
+slob_overall_row_poss$`PLAY CALLS` <- 'Overall'
+slob_rows_poss <- poss_metrics %>%
+  filter(grepl("SLOB", `PLAY CALLS`, ignore.case = TRUE))
+slob_rows_poss <- slob_rows_poss %>% arrange(desc(total_calls))
+slob_rows_poss <- rbind(slob_rows_poss, slob_overall_row_poss)
+slob_rows_poss <- slob_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "SLOB" ~ "Unlabeled", 
+      grepl("SLOB", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("SLOB", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+slob_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'SLOB')
+slob_overall_row_rating$`PLAY CALLS` <- 'Overall'
+slob_rows_rating <- rating_metrics %>%
+  filter(grepl("SLOB", `PLAY CALLS`, ignore.case = TRUE))
+slob_rows_rating <- slob_rows_rating %>% arrange(desc(total_calls))
+slob_rows_rating <- rbind(slob_rows_rating, slob_overall_row_rating)
+slob_rows_rating <- slob_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "SLOB" ~ "Unlabeled", 
+      grepl("SLOB", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("SLOB", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+slob_poss_metrics <- slob_rows_poss
+slob_rating_metrics <- slob_rows_rating
+
+#--
+
+trans_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'TRANS' | `PLAY CALLS` == 'TRANSITION')
+trans_overall_row_poss$`PLAY CALLS` <- 'Overall'
+trans_rows_poss <- poss_metrics %>%
+  filter(grepl("TRANS|TRANSITION", `PLAY CALLS`, ignore.case = TRUE))
+trans_rows_poss <- trans_rows_poss %>% arrange(desc(total_calls))
+trans_rows_poss <- rbind(trans_rows_poss, trans_overall_row_poss)
+trans_rows_poss <- trans_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "TRANS"| `PLAY CALLS` == 'TRANSITION' ~ "Unlabeled", 
+      grepl("TRANS|TRANSITION", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("TRANS|TRANSITION", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+trans_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'TRANS' | `PLAY CALLS` == 'TRANSITION')
+trans_overall_row_rating$`PLAY CALLS` <- 'Overall'
+trans_rows_rating <- rating_metrics %>%
+  filter(grepl("TRANS|TRANSITION", `PLAY CALLS`, ignore.case = TRUE))
+trans_rows_rating <- trans_rows_rating %>% arrange(desc(total_calls))
+trans_rows_rating <- rbind(trans_rows_rating, trans_overall_row_rating)
+trans_rows_rating <- trans_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "TRANS" | `PLAY CALLS` == 'TRANSITION' ~ "Unlabeled", 
+      grepl("TRANS|TRANSITION", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("TRANS|TRANSITION", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+trans_poss_metrics <- trans_rows_poss
+trans_rating_metrics <- trans_rows_rating
+
+#--
+
+zipper_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'ZIPPER')
+zipper_overall_row_poss$`PLAY CALLS` <- 'Overall'
+zipper_rows_poss <- poss_metrics %>%
+  filter(grepl("ZIPPER", `PLAY CALLS`, ignore.case = TRUE))
+zipper_rows_poss <- zipper_rows_poss %>% arrange(desc(total_calls))
+zipper_rows_poss <- rbind(zipper_rows_poss, zipper_overall_row_poss)
+zipper_rows_poss <- zipper_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "ZIPPER" ~ "Unlabeled", 
+      grepl("ZIPPER", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("ZIPPER", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+zipper_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'ZIPPER')
+zipper_overall_row_rating$`PLAY CALLS` <- 'Overall'
+zipper_rows_rating <- rating_metrics %>%
+  filter(grepl("ZIPPER", `PLAY CALLS`, ignore.case = TRUE))
+zipper_rows_rating <- zipper_rows_rating %>% arrange(desc(total_calls))
+zipper_rows_rating <- rbind(zipper_rows_rating, zipper_overall_row_rating)
+zipper_rows_rating <- zipper_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "ZIPPER" ~ "Unlabeled", 
+      grepl("ZIPPER", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("ZIPPER", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+zipper_poss_metrics <- zipper_rows_poss
+zipper_rating_metrics <- zipper_rows_rating
+
+#--
+
+zone_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'ZONE')
+zone_overall_row_poss$`PLAY CALLS` <- 'Overall'
+zone_rows_poss <- poss_metrics %>%
+  filter(grepl("ZONE", `PLAY CALLS`, ignore.case = TRUE))
+zone_rows_poss <- zone_rows_poss %>% arrange(desc(total_calls))
+zone_rows_poss <- rbind(zone_rows_poss, zone_overall_row_poss)
+zone_rows_poss <- zone_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "ZONE" ~ "Unlabeled", 
+      grepl("ZONE", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("ZONE", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+zone_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'ZONE')
+zone_overall_row_rating$`PLAY CALLS` <- 'Overall'
+zone_rows_rating <- rating_metrics %>%
+  filter(grepl("ZONE", `PLAY CALLS`, ignore.case = TRUE))
+zone_rows_rating <- zone_rows_rating %>% arrange(desc(total_calls))
+zone_rows_rating <- rbind(zone_rows_rating, zone_overall_row_rating)
+zone_rows_rating <- zone_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "ZONE" ~ "Unlabeled", 
+      grepl("ZONE", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("ZONE", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+zone_poss_metrics <- zone_rows_poss
+zone_rating_metrics <- zone_rows_rating
+
+#--
+#IVERSON
+iverson_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'IVERSON')
+iverson_overall_row_poss$`PLAY CALLS` <- 'Overall'
+iverson_rows_poss <- poss_metrics %>%
+  filter(grepl("IVERSON", `PLAY CALLS`, ignore.case = TRUE))
+iverson_rows_poss <- iverson_rows_poss %>% arrange(desc(total_calls))
+iverson_rows_poss <- rbind(iverson_rows_poss, iverson_overall_row_poss)
+iverson_rows_poss <- iverson_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "IVERSON" ~ "Unlabeled", 
+      grepl("IVERSON", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("IVERSON", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+iverson_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'IVERSON')
+iverson_overall_row_rating$`PLAY CALLS` <- 'Overall'
+iverson_rows_rating <- rating_metrics %>%
+  filter(grepl("IVERSON", `PLAY CALLS`, ignore.case = TRUE))
+iverson_rows_rating <- iverson_rows_rating %>% arrange(desc(total_calls))
+iverson_rows_rating <- rbind(iverson_rows_rating, iverson_overall_row_rating)
+iverson_rows_rating <- iverson_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "IVERSON" ~ "Unlabeled", 
+      grepl("IVERSON", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("IVERSON", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+iverson_poss_metrics <- iverson_rows_poss
+iverson_rating_metrics <- iverson_rows_rating
+
+#--
+#FIST
+fist_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'FIST')
+fist_overall_row_poss$`PLAY CALLS` <- 'Overall'
+fist_rows_poss <- poss_metrics %>%
+  filter(grepl("FIST", `PLAY CALLS`, ignore.case = TRUE))
+fist_rows_poss <- fist_rows_poss %>% arrange(desc(total_calls))
+fist_rows_poss <- rbind(fist_rows_poss, fist_overall_row_poss)
+fist_rows_poss <- fist_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "FIST" ~ "Unlabeled", 
+      grepl("FIST", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("FIST", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+fist_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'FIST')
+fist_overall_row_rating$`PLAY CALLS` <- 'Overall'
+fist_rows_rating <- rating_metrics %>%
+  filter(grepl("FIST", `PLAY CALLS`, ignore.case = TRUE))
+fist_rows_rating <- fist_rows_rating %>% arrange(desc(total_calls))
+fist_rows_rating <- rbind(fist_rows_rating, fist_overall_row_rating)
+fist_rows_rating <- fist_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "FIST" ~ "Unlabeled", 
+      grepl("FIST", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("FIST", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+fist_poss_metrics <- fist_rows_poss
+fist_rating_metrics <- fist_rows_rating
+
+#--
+#FLOPPY
+floppy_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'FLOPPY')
+floppy_overall_row_poss$`PLAY CALLS` <- 'Overall'
+floppy_rows_poss <- poss_metrics %>%
+  filter(grepl("FLOPPY", `PLAY CALLS`, ignore.case = TRUE))
+floppy_rows_poss <- floppy_rows_poss %>% arrange(desc(total_calls))
+floppy_rows_poss <- rbind(floppy_rows_poss, floppy_overall_row_poss)
+floppy_rows_poss <- floppy_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "FLOPPY" ~ "Unlabeled", 
+      grepl("FLOPPY", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("FLOPPY", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+floppy_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'FLOPPY')
+floppy_overall_row_rating$`PLAY CALLS` <- 'Overall'
+floppy_rows_rating <- rating_metrics %>%
+  filter(grepl("FLOPPY", `PLAY CALLS`, ignore.case = TRUE))
+floppy_rows_rating <- floppy_rows_rating %>% arrange(desc(total_calls))
+floppy_rows_rating <- rbind(floppy_rows_rating, floppy_overall_row_rating)
+floppy_rows_rating <- floppy_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "FLOPPY" ~ "Unlabeled", 
+      grepl("FLOPPY", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("FLOPPY", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+floppy_poss_metrics <- floppy_rows_poss
+floppy_rating_metrics <- floppy_rows_rating
+
+#--
+#DRAG
+drag_overall_row_poss <- poss_metrics_grouped %>% filter(`PLAY CALLS` == 'DRAG')
+drag_overall_row_poss$`PLAY CALLS` <- 'Overall'
+drag_rows_poss <- poss_metrics %>%
+  filter(grepl("DRAG", `PLAY CALLS`, ignore.case = TRUE))
+drag_rows_poss <- drag_rows_poss %>% arrange(desc(total_calls))
+drag_rows_poss <- rbind(drag_rows_poss, drag_overall_row_poss)
+drag_rows_poss <- drag_rows_poss %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "DRAG" ~ "Unlabeled", 
+      grepl("DRAG", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("DRAG", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+drag_overall_row_rating <- rating_metrics_grouped %>% filter(`PLAY CALLS` == 'DRAG')
+drag_overall_row_rating$`PLAY CALLS` <- 'Overall'
+drag_rows_rating <- rating_metrics %>%
+  filter(grepl("DRAG", `PLAY CALLS`, ignore.case = TRUE))
+drag_rows_rating <- drag_rows_rating %>% arrange(desc(total_calls))
+drag_rows_rating <- rbind(drag_rows_rating, drag_overall_row_rating)
+drag_rows_rating <- drag_rows_rating %>%
+  mutate(
+    `PLAY CALLS` = case_when(
+      `PLAY CALLS` == "DRAG" ~ "Unlabeled", 
+      grepl("DRAG", `PLAY CALLS`, ignore.case = TRUE) ~ gsub("DRAG", "", `PLAY CALLS`, ignore.case = TRUE) %>% str_trim(),
+      TRUE ~ `PLAY CALLS`
+    )
+  )
+
+drag_poss_metrics <- drag_rows_poss
+drag_rating_metrics <- drag_rows_rating
+
+#--
+
+# write.csv(horns_poss_metrics, 'Horns Possession Outcome Metrics.csv')
+# write.csv(horns_rating_metrics, 'Horns Possession Rating Metrics.csv')
+# 
+# write.csv(blob_poss_metrics, 'BLOB Possession Outcome Metrics.csv')
+# write.csv(blob_rating_metrics, 'BLOB Possession Rating Metrics.csv')
+# 
+# write.csv(blue_poss_metrics, 'Blue Possession Outcome Metrics.csv')
+# write.csv(blue_rating_metrics, 'Blue Possession Rating Metrics.csv')
+# 
+# write.csv(chin_poss_metrics, 'Chin Possession Outcome Metrics.csv')
+# write.csv(chin_rating_metrics, 'Chin Possession Rating Metrics.csv')
+# 
+# write.csv(slob_poss_metrics, 'SLOB Possession Outcome Metrics.csv')
+# write.csv(slob_rating_metrics, 'SLOB Possession Rating Metrics.csv')
+# 
+# write.csv(trans_poss_metrics, 'Transition Possession Outcome Metrics.csv')
+# write.csv(trans_rating_metrics, 'Transition Possession Rating Metrics.csv')
+# 
+# write.csv(zipper_poss_metrics, 'Zipper Possession Outcome Metrics.csv')
+# write.csv(zipper_rating_metrics, 'Zipper Possession Rating Metrics.csv')
+# 
+# write.csv(zone_poss_metrics, 'Zone Possession Outcome Metrics.csv')
+# write.csv(zone_rating_metrics, 'Zone Possession Rating Metrics.csv')
+# 
+# write.csv(iverson_poss_metrics, 'Iverson Possession Outcome Metrics.csv')
+# write.csv(iverson_rating_metrics, 'Iverson Possession Rating Metrics.csv')
+# 
+# write.csv(fist_poss_metrics, 'Fist Possession Outcome Metrics.csv')
+# write.csv(fist_rating_metrics, 'Fist Possession Rating Metrics.csv')
+# 
+# write.csv(floppy_poss_metrics, 'Floppy Possession Outcome Metrics.csv')
+# write.csv(floppy_rating_metrics, 'Floppy Possession Rating Metrics.csv')
+
+# write.csv(drag_poss_metrics, 'Drag Possession Outcome Metrics.csv')
+# write.csv(drag_rating_metrics, 'Drag Possession Rating Metrics.csv')
+```
+
+comps
+```{r}
+select1 <- 'AWAY'
+select2 <- 'BATTLE'
+
+select1_poss_comp <- poss_metrics %>% filter(`PLAY CALLS` == select1)
+select2_poss_comp <- poss_metrics %>% filter(`PLAY CALLS` == select2)
+
+select1_poss_comp <- select1_poss_comp[,-1]
+select2_poss_comp <- select2_poss_comp[,-1]
+
+comp_poss_df <- data.frame(Stat = c('# of Possessions', 'PPP', 'eFG%', 'FG', 'FG%', '2pt', '2pt%', '3pt', '3pt%'))
+
+select1_poss_comp <- as.data.frame(t(select1_poss_comp))
+select2_poss_comp <- as.data.frame(t(select2_poss_comp))
+
+colnames(select1_poss_comp) <- c(select1)
+colnames(select2_poss_comp) <- c(select2)
+
+comp_poss_df <- cbind(select1_poss_comp, comp_poss_df, select2_poss_comp)
+
+title_header <- glue("
+  <div style='display: flex; align-items: center; justify-content: space-between;'>
+    <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/1200px-North_Carolina_Tar_Heels_logo.svg.png' style='height: 50px;'>
+    <div style='text-align: center;'>
+      <div style='font-size: 20px; font-weight: bold;'>{select1} vs {select2}</div>
+      <div style='font-size: 14px; font-weight: normal;'>Possession Outcome Stats</div>
+    </div>
+    <img src='https://upload.wikimedia.org/wikipedia/en/thumb/3/37/Jumpman_logo.svg/400px-Jumpman_logo.svg.png' style='height: 50px;'>
+  </div>
+  ")
+range1 <- sort(as.numeric(c(comp_poss_df[1,1], comp_poss_df[1,3])))
+range2 <- sort(as.numeric(c(comp_poss_df[2,1], comp_poss_df[2,3])))
+range3 <- sort(as.numeric(c(comp_poss_df[3,1], comp_poss_df[3,3])))
+range4 <- sort(as.numeric(c(comp_poss_df[5,1], comp_poss_df[5,3])))
+range5 <- sort(as.numeric(c(comp_poss_df[7,1], comp_poss_df[7,3])))
+range6 <- sort(as.numeric(c(comp_poss_df[9,1], comp_poss_df[9,3])))
+comp_poss_tbl <- comp_poss_df %>%
+  gt() %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(vars(Stat)), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  gt_add_divider(Stat) %>%
+  gt_add_divider(columns = 1) %>%
+  tab_style(locations = cells_body(vars(-Stat)), style = cell_text(align = 'center')) %>%
+  data_color(columns = c(1,3), rows = 1, palette = c('white', '#7bafd4'), direction = c('row'), domain = range1) %>%
+  data_color(columns = c(1,3), rows = 2, palette = c('white', '#7bafd4'), direction = c('row'), domain = range2) %>%
+  data_color(columns = c(1,3), rows = 3, palette = c('white', '#7bafd4'), direction = c('row'), domain = range3) %>%
+  data_color(columns = c(1,3), rows = 5, palette = c('white', '#7bafd4'), direction = c('row'), domain = range4) %>%
+  data_color(columns = c(1,3), rows = 7, palette = c('white', '#7bafd4'), direction = c('row'), domain = range5) %>%
+  data_color(columns = c(1,3), rows = 9, palette = c('white', '#7bafd4'), direction = c('row'), domain = range6) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(c(1,2,3)~px(150))
+comp_poss_tbl
+
+#--
+
+select1_rating_comp <- rating_metrics %>% filter(`PLAY CALLS` == select1)
+select2_rating_comp <- rating_metrics %>% filter(`PLAY CALLS` == select2)
+
+select1_rating_comp <- select1_rating_comp[,-1]
+select2_rating_comp <- select2_rating_comp[,-1]
+
+comp_rating_df <- data.frame(Stat = c('# of Possessions', 'FD Rate', '1v1 Advantage Rate', 'Contested Rate', 'Open Rate', 'Tov Rate'))
+
+select1_rating_comp <- as.data.frame(t(select1_rating_comp))
+select2_rating_comp <- as.data.frame(t(select2_rating_comp))
+
+colnames(select1_rating_comp) <- c(select1)
+colnames(select2_rating_comp) <- c(select2)
+
+comp_rating_df <- cbind(select1_rating_comp, comp_rating_df, select2_rating_comp)
+
+title_header <- glue("
+  <div style='display: flex; align-items: center; justify-content: space-between;'>
+    <img src='https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/North_Carolina_Tar_Heels_logo.svg/1200px-North_Carolina_Tar_Heels_logo.svg.png' style='height: 50px;'>
+    <div style='text-align: center;'>
+      <div style='font-size: 20px; font-weight: bold;'>{select1} vs {select2}</div>
+      <div style='font-size: 14px; font-weight: normal;'>Possession Rating Stats</div>
+    </div>
+    <img src='https://upload.wikimedia.org/wikipedia/en/thumb/3/37/Jumpman_logo.svg/400px-Jumpman_logo.svg.png' style='height: 50px;'>
+  </div>
+  ")
+range1 <- sort(as.numeric(c(comp_rating_df[1,1], comp_rating_df[1,3])))
+range2 <- sort(as.numeric(c(comp_rating_df[2,1], comp_rating_df[2,3])))
+range3 <- sort(as.numeric(c(comp_rating_df[3,1], comp_rating_df[3,3])))
+range4 <- sort(as.numeric(c(comp_rating_df[4,1], comp_rating_df[4,3])))
+range5 <- sort(as.numeric(c(comp_rating_df[5,1], comp_rating_df[5,3])))
+range6 <- sort(as.numeric(c(comp_rating_df[6,1], comp_rating_df[6,3])))
+comp_rating_tbl <- comp_rating_df %>%
+  gt() %>%
+  tab_style(locations = cells_column_labels(), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  tab_style(locations = cells_body(vars(Stat)), style = cell_text(align = 'center', weight = 'bold', decorate = 'underline')) %>%
+  gt_add_divider(Stat) %>%
+  gt_add_divider(columns = 1) %>%
+  tab_style(locations = cells_body(vars(-Stat)), style = cell_text(align = 'center')) %>%
+  data_color(columns = c(1,3), rows = 1, palette = c('white', '#7bafd4'), direction = c('row'), domain = range1) %>%
+  data_color(columns = c(1,3), rows = 2, palette = c('white', '#7bafd4'), direction = c('row'), domain = range2) %>%
+  data_color(columns = c(1,3), rows = 3, palette = c('white', '#7bafd4'), direction = c('row'), domain = range3) %>%
+  data_color(columns = c(1,3), rows = 4, palette = c('#7bafd4', 'white'), direction = c('row'), domain = range4) %>%
+  data_color(columns = c(1,3), rows = 5, palette = c('white', '#7bafd4'), direction = c('row'), domain = range5) %>%
+  data_color(columns = c(1,3), rows = 6, palette = c('#7bafd4', 'white'), direction = c('row'), domain = range6) %>%
+  tab_header(title = html(title_header)) %>%
+  cols_width(c(1,2,3)~px(150))
+comp_rating_tbl
+
+#sets <- c(unique(poss_metrics$`PLAY CALLS`))
+```
+
+
+```{r}
+# outcome <- read.csv('/Users/gregorylederer/Desktop/UNC WBB/Projects/Play Calls/PlayCalls/Possession Outcome Stats.csv')
+# rating <- read.csv('/Users/gregorylederer/Desktop/UNC WBB/Projects/Play Calls/PlayCalls/Possession Rating Stats.csv')
+# 
+# rating <- right_join(rating, outcome, by = 'PLAY.CALLS') %>% select(PLAY.CALLS, total_calls.x, FD_rate, Advantage_rate, Contested_rate, Open_rate, TO_rate, PPP)
+```
+

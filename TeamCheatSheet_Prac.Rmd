@@ -1,0 +1,142 @@
+---
+title: "TeamCheatSheet_Prac"
+output: html_document
+date: "2025-03-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/gregorylederer/Desktop/UNC WBB/Projects/TeamCheatSheet Practice")
+```
+
+#packages
+```{r}
+library(tidyverse)
+library(dplyr)
+library(htmltools)
+library(rvest)
+library(gt)
+library(gtExtras)
+library(glue)
+source('https://gist.github.com/andreweatherman/0a81c7122a133a015583587573a123ff/raw/4cd6b9db1d39c46e1b93b069bc801e4eac846b19/gt_plt_bar_pct.R')
+library(geomtextpath)
+library(ggplot2)
+library(gamezoneR)
+library(purrr)
+library(gridExtra)
+library(grid)
+library(png)
+library(lubridate)
+```
+
+#input
+```{r}
+select_team <- 'North Carolina'
+my_team <- 'Duke'
+```
+
+#data
+```{r}
+data_reg_school <- reg_school()
+data_adv_school <- adv_school()
+data_reg_opp <- reg_opp()
+data_adv_opp <- adv_opp()
+```
+
+#visuals
+```{r}
+report_card <- Team4FactReportCard(select_school = select_team, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+wheel <- TeamWheel(select_school = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp)
+wheel_nums <- TeamWheel_Values(select_school = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp)
+
+ppg_o <- ColumnComparison(stat = 'PPG', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+ppg_d <- ColumnComparison(stat = 'PPG', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+ppp_o <- ColumnComparison(stat = 'PPP', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+ppp_d <- ColumnComparison(stat = 'PPP', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+pace_o <- ColumnComparison(stat = 'Pace', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+pace_d <- ColumnComparison(stat = 'Pace', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+efg_o <- ColumnComparison(stat = 'eFG%', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+efg_d <- ColumnComparison(stat = 'eFG%', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+tov_o <- ColumnComparison(stat = 'Turnover Rate', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+tov_d <- ColumnComparison(stat = 'Turnover Rate', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+ftar_o <- ColumnComparison(stat = 'FTAr', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+ftar_d <- ColumnComparison(stat = 'FTAr', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+orb_o <- ColumnComparison(stat = 'ORB%', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+orb_d <- ColumnComparison(stat = 'ORB%', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+trb_o <- ColumnComparison(stat = 'TRB%', off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+trb_d <- ColumnComparison(stat = 'TRB%', off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, reg_opp_data = data_reg_opp, adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+wl_tbl <- WL_Comp(select_school = select_team)
+
+banner <- TeamBanner1(select_school = select_team)
+
+bar1 <- OffDefBars(off_team = select_team, def_team = my_team, reg_school_data = data_reg_school, adv_school_data = data_adv_school, reg_opp_data = data_reg_opp, adv_opp_data = data_adv_opp)
+bar2 <- OffDefBars(off_team = my_team, def_team = select_team, reg_school_data = data_reg_school, adv_school_data = data_adv_school, reg_opp_data = data_reg_opp, adv_opp_data = data_adv_opp)
+
+plot1 <- TeamPlots(select_school1 = select_team, select_school2 = my_team, select_stat = 'TS%', adv_school_data = data_adv_school, adv_opp_data = data_adv_opp)
+
+roster <- TeamRoster(select_school = select_team)
+
+banner2 <- TeamBanner2(school1 = select_team, school2 = my_team)
+```
+
+```{r}
+# gtsave(data = report_card, filename = 'Report Card.png')
+# ggsave(plot = wheel, filename = 'Wheel Plot.png')
+# gtsave(data = wheel_nums, filename = 'Wheel Numbers.png')
+# ggsave(plot = ppg_o, filename = 'PPG Off.png')
+# ggsave(plot = ppg_d, filename = 'PPG Def.png')
+# ggsave(plot = ppp_o, filename = 'PPP Off.png')
+# ggsave(plot = ppp_d, filename = 'PPP Def.png')
+# ggsave(plot = pace_o, filename = 'Pace Off.png')
+# ggsave(plot = pace_d, filename = 'Pace Def.png')
+# ggsave(plot = efg_o, filename = 'eFG Off.png')
+# ggsave(plot = efg_d, filename = 'eFG Def.png')
+# ggsave(plot = tov_o, filename = 'Tov Off.png')
+# ggsave(plot = tov_d, filename = 'Tov Def.png')
+# ggsave(plot = ftar_o, filename = 'FTAr Off.png')
+# ggsave(plot = ftar_d, filename = 'FTAr Def.png')
+# ggsave(plot = orb_o, filename = 'ORB Off.png')
+# ggsave(plot = orb_d, filename = 'ORB Def.png')
+# ggsave(plot = trb_o, filename = 'TRB Off.png')
+# ggsave(plot = trb_d, filename = 'TRB Def.png')
+# gtsave(data = wl_tbl, filename = 'WL Table.png')
+# gtsave(data =  banner, filename = 'Banner.png')
+# ggsave(plot = bar1, filename = 'Bar 1.png')
+# ggsave(plot = bar2, filename = 'Bar 2.png')
+# ggsave(plot = plot1, filename = 'Team TS Plot.png')
+# gtsave(data = roster, filename = 'Roster.png')
+gtsave(data = banner2, filename = 'Banner2.png')
+```
+
+```{r, eval=F}
+layout = matrix(c(1,2,3,4,1,5,5,5), ncol = 2)
+height_matrix = c(0.1, 0.3, 0.3, 0.3)
+width_matrix = c(0.9, 1)
+
+report_card_img <- rasterGrob(readPNG('Report Card.png'))
+wl_tbl_img <- rasterGrob(readPNG('WL Table.png'))
+wheel_nums_img <- rasterGrob(readPNG('Wheel Numbers.png'))
+banner_img <- rasterGrob(readPNG('Banner.png'))
+grid_plot <- grid.arrange(banner_img,report_card_img, wheel, wheel_nums_img, wl_tbl_img, layout_matrix = layout, heights = height_matrix, widths = width_matrix)
+ggsave(plot = grid_plot, filename = 'Test Grid.png', width = 8, height = 10)
+```
+
+```{r, eval=F}
+layout2 = matrix(c(1,2,3,1,4,5), ncol = 2)
+height_matrix = c(0.08, 0.46, 0.46)
+
+banner2_img <- rasterGrob(readPNG('Banner2.png'))
+roster_img <- rasterGrob(readPNG('Roster.png'))
+
+grid_plot2 <- grid.arrange(banner2_img, roster_img, bar1, plot1, bar2, layout_matrix = layout2, heights = height_matrix)
+ggsave(plot = grid_plot2, filename = 'Test Grid 2.png', width = 8, height = 10)
+```
+
